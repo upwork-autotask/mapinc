@@ -21,8 +21,12 @@
         <a href="{% url 'audit_log' %}">Audit</a>
         <a href="{% url 'admin:auth_user_changelist' %}">Users</a>
         {% endif %}
+        {% if auth_mode == "remote_user" %}
+        <span class="muted" title="Signed in with Windows">{{ request.user.username }}</span>
+        {% else %}
         <form method="post" action="{% url 'logout' %}" class="inline">{% csrf_token %}<button type="submit" class="small" title="Signed in as {{ request.user.username }}">Logout</button></form>
-      {% else %}
+        {% endif %}
+      {% elif auth_mode != "remote_user" %}
         {% block login_button %}<a class="button small" href="{% url 'login' %}?next={% url 'settings' %}">Login</a>{% endblock %}
       {% endif %}
     </nav>

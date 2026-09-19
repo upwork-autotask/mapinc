@@ -15,7 +15,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from . import audit
-from .decorators import staff_required
+from .decorators import letter_access, staff_required
 from .docgen.service import LetterGenerationError, generate_letter
 from .forms import AppSettingsForm, LetterForm
 from .models import AppSettings, AuditEvent, Handoff, Letter
@@ -61,6 +61,7 @@ def _initial_from_request(request) -> tuple[dict, bool]:
     return initial, expired
 
 
+@letter_access
 @require_http_methods(["GET", "POST"])
 def letter_form(request):
     context = {"app_settings": AppSettings.load()}
@@ -69,9 +70,11 @@ def letter_form(request):
         if form.is_valid():
             data = form.cleaned_data
             windows_user = data.get("user", "")
+            # A verified identity (app login or Windows auth) beats the launcher's self-reported name.
+            actor = request.user.get_username() if request.user.is_authenticated else windows_user
             existed = Letter.objects.filter(case_encounter=data["case_encounter"]).exists()
             try:
-                letter = generate_letter(data, windows_user)
+                letter = generate_letter(data, actor)
             except LetterGenerationError as exc:
                 audit.record(request, Action.LETTER_FAILED, case_encounter=data["case_encounter"],
                              detail=str(exc), windows_user=windows_user)
@@ -92,6 +95,7 @@ def letter_form(request):
     return render(request, "letters/form.html", {**context, "form": form})
 
 
+@letter_access
 def letter_pdf(request, case_encounter: str):
     letter = get_object_or_404(Letter, case_encounter=case_encounter)
     path = Path(letter.pdf_path) if letter.pdf_path else None
