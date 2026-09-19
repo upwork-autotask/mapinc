@@ -1,14 +1,13 @@
 """
-Django settings for mapinc. All environment-specific values come from
-mapinc.ini next to manage.py (see mapinc.ini.example). Set the MAPINC_INI
-environment variable to point at a different file (e.g. one with the
-migration role for `manage.py migrate`).
+Django settings for mapinc. Every environment-specific value is a MAPINC_*
+environment variable; a .env file next to manage.py is read as a convenience
+(see .env.example and mapinc/env.py).
 """
-import configparser
-import os
 import sys
 from datetime import timedelta
 from pathlib import Path
+
+from . import env
 
 if sys.version_info < (3, 10):
     raise SystemExit(
@@ -23,37 +22,24 @@ if sys.version_info < (3, 10):
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-_INI_PATH = Path(os.environ.get("MAPINC_INI") or BASE_DIR / "mapinc.ini")
-if not _INI_PATH.exists():
-    raise RuntimeError(
-        f"Missing {_INI_PATH}. Copy mapinc.ini.example to mapinc.ini and edit it."
-    )
-MAPINC_CONFIG = configparser.ConfigParser(inline_comment_prefixes=(";", "#"))
-MAPINC_CONFIG.read(_INI_PATH, encoding="utf-8")
+SECRET_KEY = env.get("MAPINC_SECRET_KEY", "change-me")
+DEBUG = env.get_bool("MAPINC_DEBUG", False)
+ALLOWED_HOSTS = env.get_list("MAPINC_ALLOWED_HOSTS", "*")
 
-_db = MAPINC_CONFIG["database"]
-_app = MAPINC_CONFIG["app"]
-
-SECRET_KEY = _app.get("secret_key", "change-me")
-DEBUG = _app.getboolean("debug", fallback=False)
-ALLOWED_HOSTS = [h.strip() for h in _app.get("allowed_hosts", "*").split(",") if h.strip()]
-
-PDF_CONVERTER = _app.get("pdf_converter", "word").strip().lower()
-WORD_TIMEOUT_SECONDS = _app.getint("word_timeout_seconds", fallback=60)
+PDF_CONVERTER = env.get("MAPINC_PDF_CONVERTER", "word").lower()
+WORD_TIMEOUT_SECONDS = env.get_int("MAPINC_WORD_TIMEOUT_SECONDS", 60)
 
 # --- HIPAA hardening switches (see docs/hipaa-hardening-plan.md) -------------
-MAPINC_PRODUCTION = _app.getboolean("production", fallback=False)
-MAPINC_HTTPS = _app.getboolean("https", fallback=MAPINC_PRODUCTION)
-MAPINC_BEHIND_PROXY = _app.getboolean("behind_proxy", fallback=False)
-MAPINC_AUTH_MODE = _app.get("auth_mode", "open").strip().lower()          # open | login | remote_user
-MAPINC_SESSION_MINUTES = _app.getint("session_minutes", fallback=30)
-MAPINC_ALLOW_QUERY_PREFILL = _app.getboolean("allow_query_prefill", fallback=not MAPINC_PRODUCTION)
-MAPINC_HANDOFF_MINUTES = _app.getint("handoff_minutes", fallback=5)
-MAPINC_HANDOFF_ALLOWED_NETWORKS = [
-    n.strip() for n in _app.get("handoff_allowed_networks", "").split(",") if n.strip()
-]
+MAPINC_PRODUCTION = env.get_bool("MAPINC_PRODUCTION", False)
+MAPINC_HTTPS = env.get_bool("MAPINC_HTTPS", MAPINC_PRODUCTION)
+MAPINC_BEHIND_PROXY = env.get_bool("MAPINC_BEHIND_PROXY", False)
+MAPINC_AUTH_MODE = env.get("MAPINC_AUTH_MODE", "open").lower()          # open | login | remote_user
+MAPINC_SESSION_MINUTES = env.get_int("MAPINC_SESSION_MINUTES", 30)
+MAPINC_ALLOW_QUERY_PREFILL = env.get_bool("MAPINC_ALLOW_QUERY_PREFILL", not MAPINC_PRODUCTION)
+MAPINC_HANDOFF_MINUTES = env.get_int("MAPINC_HANDOFF_MINUTES", 5)
+MAPINC_HANDOFF_ALLOWED_NETWORKS = env.get_list("MAPINC_HANDOFF_ALLOWED_NETWORKS")
 if MAPINC_AUTH_MODE not in {"open", "login", "remote_user"}:
-    raise RuntimeError(f"mapinc.ini: auth_mode must be open, login or remote_user (got {MAPINC_AUTH_MODE!r})")
+    raise RuntimeError(f"MAPINC_AUTH_MODE must be open, login or remote_user (got {MAPINC_AUTH_MODE!r})")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -110,18 +96,18 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "mapinc.wsgi.application"
 
-_db_options = {"sslmode": _db.get("sslmode", "prefer").strip()}
-if _db.get("sslrootcert", "").strip():
-    _db_options["sslrootcert"] = _db.get("sslrootcert").strip()
+_db_options = {"sslmode": env.get("MAPINC_DB_SSLMODE", "prefer")}
+if env.get("MAPINC_DB_SSLROOTCERT"):
+    _db_options["sslrootcert"] = env.get("MAPINC_DB_SSLROOTCERT")
 
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": _db.get("name", "mapinc"),
-        "USER": _db.get("user", "mapinc"),
-        "PASSWORD": _db.get("password", ""),
-        "HOST": _db.get("host", "localhost"),
-        "PORT": _db.get("port", "5432"),
+        "NAME": env.get("MAPINC_DB_NAME", "mapinc"),
+        "USER": env.get("MAPINC_DB_USER", "mapinc"),
+        "PASSWORD": env.get("MAPINC_DB_PASSWORD", ""),
+        "HOST": env.get("MAPINC_DB_HOST", "localhost"),
+        "PORT": env.get("MAPINC_DB_PORT", "5432"),
         "OPTIONS": _db_options,
     }
 }
@@ -134,8 +120,8 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # --- Login lockout (django-axes) ---------------------------------------------
-AXES_FAILURE_LIMIT = _app.getint("lockout_failures", fallback=5)
-AXES_COOLOFF_TIME = timedelta(minutes=_app.getint("lockout_minutes", fallback=15))
+AXES_FAILURE_LIMIT = env.get_int("MAPINC_LOCKOUT_FAILURES", 5)
+AXES_COOLOFF_TIME = timedelta(minutes=env.get_int("MAPINC_LOCKOUT_MINUTES", 15))
 AXES_LOCKOUT_PARAMETERS = ["username"]                # lock the account, whatever the source address
 # W006 warns that username-only lockout can be bypassed by rotating IPs; here it is deliberate so
 # that one bad actor behind the shared office NAT cannot lock out every user at once.

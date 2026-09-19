@@ -5,7 +5,7 @@ Run in an elevated PowerShell on the database server AFTER 01-database-roles.sql
   .\02-postgresql-hardening.ps1 -PgVersion 18 -CertPath C:\certs\server.crt -KeyPath C:\certs\server.key
 
 Without -CertPath/-KeyPath a self-signed certificate is generated (fine for
-localhost-only connections; use sslmode = require in mapinc.ini). With a
+localhost-only connections; use MAPINC_DB_SSLMODE=require in .env). With a
 certificate from the domain CA, clients can use sslmode = verify-full.
 #>
 param(

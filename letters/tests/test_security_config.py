@@ -40,9 +40,10 @@ def test_session_hardening_defaults():
     assert dj_settings.SESSION_COOKIE_HTTPONLY is True
 
 
-def test_database_sslmode_comes_from_ini():
+def test_database_sslmode_comes_from_environment():
+    from mapinc import env
     opts = dj_settings.DATABASES["default"]["OPTIONS"]
-    assert opts["sslmode"] == dj_settings.MAPINC_CONFIG["database"].get("sslmode", "prefer")
+    assert opts["sslmode"] == env.get("MAPINC_DB_SSLMODE", "prefer")
 
 
 # --- production startup checks -----------------------------------------------

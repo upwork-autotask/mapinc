@@ -3,8 +3,8 @@
 Scripts for the server-side phases of `docs/hipaa-hardening-plan.md`. Run them
 in order, elevated, on the on-premises server. The application-side changes
 (audit log, auth modes, lockout, hardened sessions, handoff tokens, startup
-checks) are already in the code and switched on by `production = true` in
-`mapinc.ini`.
+checks) are already in the code and switched on by `MAPINC_PRODUCTION=true` in
+`.env`.
 
 | Step | Script | What it does |
 |---|---|---|
@@ -15,9 +15,9 @@ checks) are already in the code and switched on by `production = true` in
 | 5 | `05-backup-and-tasks.ps1` | Nightly `pg_dump` + `robocopy` to an encrypted volume with retention; nightly handoff-token purge |
 | 6 | `06-install-service.ps1` | Runs `run.bat` as a Windows service under a low-privilege account, bound to `127.0.0.1:8000` |
 
-Config templates: `mapinc.ini.production` (app role) and
-`mapinc.migrate.ini.production` (owner role, used via `MAPINC_INI` for
-`manage.py migrate` only).
+Config templates: `env.production` (app role → `.env`) and
+`env.migrate.production` (owner role → `.env.migrate`, used via `MAPINC_ENV_FILE`
+for `manage.py migrate` only).
 
 ## Order of operations on go-live
 
@@ -31,15 +31,16 @@ pip install -r requirements.txt
 & "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -h localhost -d mapinc -f deploy\01-database-roles.sql
 
 # 2. config files
-Copy-Item deploy\mapinc.ini.production mapinc.ini                  # edit CHANGE-ME values
-Copy-Item deploy\mapinc.migrate.ini.production mapinc.migrate.ini  # edit; Administrators-only ACL
-icacls mapinc.migrate.ini /inheritance:r /grant:r "BUILTIN\Administrators:F" "SYSTEM:F"
+Copy-Item deploy\env.production .env                   # edit CHANGE-ME values
+Copy-Item deploy\env.migrate.production .env.migrate   # edit; Administrators-only ACL
+icacls .env /inheritance:r /grant:r "BUILTIN\Administrators:F" "SYSTEM:F" "MAP\svc-mapinc:R"
+icacls .env.migrate /inheritance:r /grant:r "BUILTIN\Administrators:F" "SYSTEM:F"
 
 # 3. postgres TLS/SCRAM (re-enters the role passwords so they are stored as SCRAM)
 .\deploy\02-postgresql-hardening.ps1 -PgVersion 18
 
 # 4. migrate as the owner role, then confirm the config passes the checks
-$env:MAPINC_INI = "C:\mapinc\mapinc.migrate.ini"; python manage.py migrate; Remove-Item Env:MAPINC_INI
+$env:MAPINC_ENV_FILE = "C:\mapinc\.env.migrate"; python manage.py migrate; Remove-Item Env:MAPINC_ENV_FILE
 python manage.py check
 
 # 5. firewall, folders, IIS, backups, service

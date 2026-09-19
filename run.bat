@@ -5,13 +5,13 @@ cd /d "%~dp0"
 call .venv\Scripts\activate.bat
 python manage.py check
 if errorlevel 1 (
-  echo Configuration check failed - fix mapinc.ini as described above and try again.
+  echo Configuration check failed - fix .env as described above and try again.
   pause
   exit /b 1
 )
 python manage.py migrate --noinput
 if errorlevel 1 (
-  echo Database migration failed - check mapinc.ini and that PostgreSQL is running.
+  echo Database migration failed - check .env and that PostgreSQL is running.
   pause
   exit /b 1
 )

@@ -1,7 +1,11 @@
 .venv/
 __pycache__/
 *.pyc
+.env
+.env.*
+!.env.example
 mapinc.ini
+mapinc.migrate.ini
 media/
 staticfiles/
 .pytest_cache/

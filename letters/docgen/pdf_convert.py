@@ -47,7 +47,7 @@ def convert(docx_path: Path, pdf_path: Path, converter: str | None = None) -> No
     elif converter == "libreoffice":
         _convert_libreoffice(docx_path, pdf_path, settings.WORD_TIMEOUT_SECONDS)
     else:
-        raise ConversionError(f"Unknown pdf_converter {converter!r} in mapinc.ini")
+        raise ConversionError(f"Unknown pdf_converter {converter!r} in MAPINC_PDF_CONVERTER")
 
     if not pdf_path.exists() or pdf_path.stat().st_size == 0:
         raise ConversionError(f"{converter} produced no PDF at {pdf_path}")

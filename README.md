@@ -16,7 +16,7 @@ Design: `docs/superpowers/specs/2026-09-19-clinicals-letter-design.md`.
 py -3.13 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-Copy-Item mapinc.ini.example mapinc.ini    # then edit: database host/name/user/password, secret_key
+Copy-Item .env.example .env                # then edit: MAPINC_DB_* and MAPINC_SECRET_KEY
 python manage.py migrate
 python manage.py createsuperuser
 python manage.py load_default_template
@@ -58,10 +58,10 @@ python manage.py runserver
 
 **Troubleshooting**
 - *"mapinc requires Python 3.10 or newer"* or `TypeError: unsupported operand type(s) for |` — the virtualenv was created with an old Python (e.g. 3.9). Install Python 3.13, then `Remove-Item -Recurse .venv`, `py -3.13 -m venv .venv`, activate it and `pip install -r requirements.txt` again.
-- *"Database migration failed"* — PostgreSQL is not running or `mapinc.ini` has the wrong host/user/password.
-- *"Missing mapinc.ini"* — copy `mapinc.ini.example` to `mapinc.ini` (see First-time setup).
+- *"Database migration failed"* — PostgreSQL is not running or the `MAPINC_DB_*` values in `.env` are wrong.
+- *Still have a `mapinc.ini` from an older version?* — run `python manage.py ini_to_env` once; it writes the equivalent `.env`, then delete the ini.
 - *Port already in use* — another copy is running; find it with `netstat -ano | findstr :8000` and stop it, or change the port in `run.bat`.
-- *"Configuration check failed"* on start — `production = true` and something in `mapinc.ini` is unsafe; the messages name the key (secret key, allowed_hosts, sslmode, database user, auth_mode, https, allow_query_prefill).
+- *"Configuration check failed"* on start — `MAPINC_PRODUCTION=true` and something in `.env` is unsafe; the messages name the key (secret key, allowed_hosts, sslmode, database user, auth_mode, https, allow_query_prefill).
 - *PDF not created / "Word did not finish"* — the account running `run.bat` must be able to start Microsoft Word; check `pdf_converter` and `word_timeout_seconds` in `mapinc.ini`.
 
 ## Using it from Access
@@ -85,22 +85,29 @@ valid 15 minutes) in a new chromeless Edge window. The plain query-string form
 still works for testing (all values editable on the form):
 `/letter/?case_encounter=…&policy_id=…&member_name=…&dob=yyyy-mm-dd&admission=…&folder_name=…&user=…`
 
-## Configuration (`mapinc.ini`)
-| key | meaning |
+## Configuration (environment variables)
+All settings are `MAPINC_*` environment variables. For convenience they are read
+from a `.env` file next to `manage.py` (copy `.env.example`); a real environment
+variable always overrides the file. `MAPINC_ENV_FILE` points at a different file
+(used for migrations with the owner role in production).
+
+| Variable | Meaning |
 |---|---|
-| `[database]` | PostgreSQL connection |
-| `[app] pdf_converter` | `word` (default) or `libreoffice` |
-| `[app] word_timeout_seconds` | kill a hung Word after this many seconds |
-| `[app] allowed_hosts` | comma-separated host names, `*` for any |
-| `[app] debug` | `true` only on a development machine |
-| `[app] production` | `true` on the live server: the app refuses to start unless the settings below are safe |
-| `[app] auth_mode` | `open` (LAN, no login), `login` (app login required), `remote_user` (IIS Windows Authentication) |
-| `[app] https`, `behind_proxy` | set when IIS terminates TLS in front of the app |
-| `[app] session_minutes` | automatic logoff after this many idle minutes (default 30) |
-| `[app] lockout_failures`, `lockout_minutes` | account lockout after failed sign-ins (5 / 15) |
-| `[app] allow_query_prefill` | allow PHI in the URL query string (dev only; launchers use handoff tokens) |
-| `[app] handoff_allowed_networks`, `handoff_minutes` | who may create handoff links and how long they live |
-| `[database] sslmode`, `sslrootcert` | TLS to PostgreSQL (`require` or `verify-full` in production) |
+| `MAPINC_DB_HOST`, `_PORT`, `_NAME`, `_USER`, `_PASSWORD` | PostgreSQL connection |
+| `MAPINC_DB_SSLMODE`, `MAPINC_DB_SSLROOTCERT` | TLS to PostgreSQL (`require` or `verify-full` in production) |
+| `MAPINC_SECRET_KEY` | Django secret key (long random string) |
+| `MAPINC_ALLOWED_HOSTS` | comma-separated host names, `*` for any |
+| `MAPINC_DEBUG` | `true` only on a development machine |
+| `MAPINC_PDF_CONVERTER` | `word` (default) or `libreoffice` |
+| `MAPINC_WORD_TIMEOUT_SECONDS` | kill a hung Word after this many seconds |
+| `MAPINC_PRODUCTION` | `true` on the live server: the app refuses to start unless the settings below are safe |
+| `MAPINC_AUTH_MODE` | `open` (LAN, no login), `login` (app login required), `remote_user` (IIS Windows Authentication) |
+| `MAPINC_HTTPS`, `MAPINC_BEHIND_PROXY` | set when IIS terminates TLS in front of the app |
+| `MAPINC_SESSION_MINUTES` | automatic logoff after this many idle minutes (default 30) |
+| `MAPINC_LOCKOUT_FAILURES`, `MAPINC_LOCKOUT_MINUTES` | account lockout after failed sign-ins (5 / 15) |
+| `MAPINC_ALLOW_QUERY_PREFILL` | allow PHI in the URL query string (dev only; launchers use handoff tokens) |
+| `MAPINC_HANDOFF_ALLOWED_NETWORKS`, `MAPINC_HANDOFF_MINUTES` | who may create handoff links and how long they live |
+| `MAPINC_LISTEN` | address Waitress binds (`run.bat`; `127.0.0.1:8000` behind IIS) |
 
 ## HIPAA hardening
 The application records an insert-only **audit trail** (letter opened / created /

@@ -39,13 +39,13 @@ Remove-Website -Name "Default Web Site"   # nothing else should answer on this b
 ```
 
 ## 4. Point the app at IIS
-`mapinc.ini` (see `deploy\mapinc.ini.production`):
+`.env` (see `deploy\env.production`):
 ```
-production = true
-https = true
-behind_proxy = true
-auth_mode = remote_user
-allowed_hosts = letters.<domain>
+MAPINC_PRODUCTION=true
+MAPINC_HTTPS=true
+MAPINC_BEHIND_PROXY=true
+MAPINC_AUTH_MODE=remote_user
+MAPINC_ALLOWED_HOSTS=letters.<domain>
 ```
 Waitress must listen on localhost only: set the environment variable
 `MAPINC_LISTEN=127.0.0.1:8000` for the service (NSSM → Environment) or before

@@ -52,9 +52,8 @@ ALTER DEFAULT PRIVILEGES FOR ROLE mapinc_owner IN SCHEMA public
 DROP ROLE IF EXISTS mapinc;   -- (or ALTER ROLE mapinc NOCREATEDB NOLOGIN)
 ALTER ROLE postgres PASSWORD '<new strong password>';
 ```
-`mapinc.ini` on the server uses `mapinc_app`; migrations are run by an admin with a
-second ini (`mapinc.migrate.ini`) or by temporarily editing the user. The app
-change to support `MAPINC_INI` env override is in Phase 3.
+`.env` on the server uses `mapinc_app`; migrations are run by an admin with a
+second file (`.env.migrate`) selected through `MAPINC_ENV_FILE`.
 
 **Row-Level Security:** not adopted. RLS partitions rows *between database
 roles*; here a single role (`mapinc_app`) serves every staff member, so RLS would
@@ -81,7 +80,7 @@ hostssl  all       postgres       127.0.0.1/32   scram-sha-256
 # nothing else — remove the ::1 / 0.0.0.0 defaults the installer added
 ```
 Restart the service, then on the client side set `sslmode = verify-full` (or
-`require` with a self-signed cert) in `mapinc.ini` (app change, Phase 3.1).
+`require` with a self-signed cert) via `MAPINC_DB_SSLMODE` in `.env`.
 
 If the database ever moves to a separate machine: keep `hostssl` only, list that
 machine's IP, and open 5432 in Windows Firewall to that IP alone.
@@ -145,7 +144,7 @@ Row-level history is captured by the app instead.
 
 | # | Change | Why |
 |---|---|---|
-| 3.1 | `mapinc.ini` gains `[database] sslmode` (default `require`) and `sslrootcert`; `MAPINC_INI` env var selects an alternate ini for migrations | in-transit encryption; separate owner/app roles |
+| 3.1 | Configuration moves to `MAPINC_*` environment variables (`.env` file); `MAPINC_DB_SSLMODE` / `MAPINC_DB_SSLROOTCERT`; `MAPINC_ENV_FILE` selects the migration file | in-transit encryption; separate owner/app roles |
 | 3.2 | Security settings when `debug = false`: `SESSION_COOKIE_AGE = 30 min`, `SESSION_EXPIRE_AT_BROWSER_CLOSE`, `SESSION_SAVE_EVERY_REQUEST`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_PROXY_SSL_HEADER`, `SECURE_HSTS_SECONDS`, `X_FRAME_OPTIONS = DENY`, `Cache-Control: no-store` on every letter/list/PDF response | automatic logoff, no ePHI cached on PCs |
 | 3.3 | **`AuditEvent` table** — `when, user, windows_user, ip, action, case_encounter, detail` — written for: form opened (prefill), letter created, letter updated, PDF downloaded, PDF regenerated, settings changed, login/logout/failed login. Read-only page under Settings ("Audit log") with date/user filters and CSV export. Rows are insert-only (app role gets no UPDATE/DELETE on this table — Phase 1.1 grant list adjusted) | HIPAA audit controls: who viewed/changed what, when |
 | 3.4 | **Identity**: the letter form currently trusts the `user=` value from Access/Outlook. Two options, choose one: (a) IIS Windows Authentication in front (Phase 4) + `RemoteUserMiddleware` → real domain identity, no extra login; (b) require app login on the letter form too. (a) is recommended: single sign-on, and `created_by/modified_by` become verified | access control, non-repudiation |
