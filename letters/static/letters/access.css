@@ -2,9 +2,9 @@
 html, body { margin: 0; background: #dcdcdc; color: #000; }
 body { display: flex; justify-content: center; padding: 24px 16px; }
 .access-form { width: 480px; max-width: 100%; background: #f0f0f0; border: 1px solid #6d6d6d; box-shadow: 2px 2px 6px rgba(0,0,0,.35); }
-.brand { background: linear-gradient(90deg, #242c7d, #213b8f); padding: 10px 12px; display: flex; justify-content: center; }
+.brand { background: linear-gradient(90deg, #242c7d, #213b8f); padding: 6px 10px; display: flex; justify-content: flex-start; }
 .brand a { display: block; line-height: 0; }
-.brand img { display: block; height: 110px; width: auto; max-width: 100%; }
+.brand img { display: block; height: 70px; width: auto; max-width: 100%; }
 .access-form.wide { width: 640px; }
 .titlebar { background: linear-gradient(#fdfdfd, #e5e5e5); border-bottom: 1px solid #a0a0a0; padding: 6px 10px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 .nav { display: flex; align-items: center; gap: 10px; font-weight: 400; }
