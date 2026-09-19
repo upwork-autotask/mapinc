@@ -18,7 +18,7 @@
         <a href="{% url 'settings' %}">Settings</a>
         <a href="{% url 'admin:letters_letter_changelist' %}">Letters</a>
         <a href="{% url 'admin:auth_user_changelist' %}">Users</a>
-        <form method="post" action="{% url 'logout' %}" class="inline">{% csrf_token %}<button type="submit" class="link" title="Signed in as {{ request.user.username }}">Logout</button></form>
+        <form method="post" action="{% url 'logout' %}" class="inline">{% csrf_token %}<button type="submit" class="small" title="Signed in as {{ request.user.username }}">Logout</button></form>
       {% else %}
         {% block login_button %}<a class="button small" href="{% url 'login' %}?next={% url 'settings' %}">Login</a>{% endblock %}
       {% endif %}
