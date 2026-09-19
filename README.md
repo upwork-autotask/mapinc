@@ -78,7 +78,10 @@ Access dependencies, plus an `OpenLetterFromPrompt` macro for a ribbon button. A
 created/modified by. Opening the form again for the same case/encounter loads the
 saved letter for editing; saving overwrites the PDF and updates the audit fields.
 
-URL format (all values editable on the form):
+The launchers do not put patient data in the URL: they `POST` the values to
+`/letter/handoff/` and open the short-lived link it returns (`/letter/?t=<token>`,
+valid 15 minutes) in a new chromeless Edge window. The plain query-string form
+still works for testing (all values editable on the form):
 `/letter/?case_encounter=…&policy_id=…&member_name=…&dob=yyyy-mm-dd&admission=…&folder_name=…&user=…`
 
 ## Configuration (`mapinc.ini`)

@@ -1,4 +1,8 @@
+import secrets
+from datetime import timedelta
+
 from django.db import models
+from django.utils import timezone
 
 
 class AppSettings(models.Model):
@@ -66,3 +70,30 @@ class Letter(models.Model):
 
     def __str__(self):
         return f"{self.case_encounter} – {self.member_name}"
+
+
+class Handoff(models.Model):
+    """
+    Short-lived stash of the values Access/Outlook wants pre-filled, so the
+    letter URL carries only an opaque token instead of patient data.
+    """
+
+    TTL = timedelta(minutes=15)
+
+    token = models.CharField(max_length=64, unique=True)
+    data = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.token
+
+    @classmethod
+    def create(cls, data: dict) -> str:
+        cls.objects.filter(created_at__lt=timezone.now() - cls.TTL).delete()
+        return cls.objects.create(token=secrets.token_urlsafe(24), data=dict(data)).token
+
+    @classmethod
+    def take(cls, token: str) -> dict | None:
+        """The stashed values, or None if the token is unknown or older than TTL."""
+        row = cls.objects.filter(token=token, created_at__gte=timezone.now() - cls.TTL).first()
+        return dict(row.data) if row else None

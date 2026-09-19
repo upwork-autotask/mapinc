@@ -3,6 +3,7 @@
 {% block content %}
   <form method="post" class="detail" novalidate>
     {% csrf_token %}
+    {% if token_expired %}<div class="msgbar">This link has expired. Please open the letter again from Access or Outlook, or type the values below.</div>{% endif %}
     {% if form.non_field_errors %}<div class="msgbar">{{ form.non_field_errors|join:" " }}</div>{% endif %}
     {% for field in form.visible_fields %}
       <div class="row{% if field.errors %} has-error{% endif %}">

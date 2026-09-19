@@ -16,8 +16,11 @@ Option Explicit
 ' Call with your own values:
 '   OpenClinicalsLetterDialog "E-2001", "WT-123456", "JOHN SMITH", #5/22/1953#, "9/15/2026", "SMITH_JOHN"
 '
-' OpenClinicalsLetterDialog opens a dialog-sized, chromeless Edge window and
-' WAITS until it is closed. OpenClinicalsLetter returns immediately.
+' How it works: the values are POSTed to the server, which answers with a
+' short-lived link (…/letter/?t=<token>) — so no patient data ever appears in
+' a URL, window title or browser history. That link is opened in a NEW,
+' chromeless Edge window sized like a dialog. OpenClinicalsLetterDialog waits
+' until that window is closed; OpenClinicalsLetter returns immediately.
 ' ---------------------------------------------------------------------------
 
 Private Const LETTER_BASE_URL As String = "http://SERVER-NAME:8000"   ' <-- server running run.bat
@@ -64,78 +67,106 @@ Public Sub OpenLetterFromPrompt()
     OpenClinicalsLetterDialog caseEncounter, policyId, memberName, dob, admission, folderName
 End Sub
 
-' Opens the letter form in a dialog-sized Edge window and waits until it is closed.
+' Opens the letter form in a new dialog-sized window and waits until it is closed.
 Public Sub OpenClinicalsLetterDialog(ByVal caseEncounter As Variant, ByVal policyId As Variant, _
                                      ByVal memberName As Variant, ByVal dob As Variant, _
                                      ByVal admission As Variant, ByVal folderName As Variant)
-    Dim pid As Double
-    pid = LaunchEdgeApp(BuildLetterUrl(caseEncounter, policyId, memberName, dob, admission, folderName))
+    Dim url As String, pid As Double
+    url = RequestHandoffUrl(caseEncounter, policyId, memberName, dob, admission, folderName)
+    If Len(url) = 0 Then Exit Sub
+    pid = LaunchDialogWindow(url)
     If pid > 0 Then WaitForProcess pid
 End Sub
 
-' Opens the letter form in a dialog-sized Edge window and returns immediately.
+' Opens the letter form in a new dialog-sized window and returns immediately.
 Public Sub OpenClinicalsLetter(ByVal caseEncounter As Variant, ByVal policyId As Variant, _
                                ByVal memberName As Variant, ByVal dob As Variant, _
                                ByVal admission As Variant, ByVal folderName As Variant)
-    LaunchEdgeApp BuildLetterUrl(caseEncounter, policyId, memberName, dob, admission, folderName)
+    Dim url As String
+    url = RequestHandoffUrl(caseEncounter, policyId, memberName, dob, admission, folderName)
+    If Len(url) > 0 Then LaunchDialogWindow url
 End Sub
 
-' Builds the pre-filled URL. Every value is optional; the form shows blanks for
-' whatever is not supplied. The Windows user name is added automatically.
-Public Function BuildLetterUrl(ByVal caseEncounter As Variant, ByVal policyId As Variant, _
-                               ByVal memberName As Variant, ByVal dob As Variant, _
-                               ByVal admission As Variant, ByVal folderName As Variant) As String
-    BuildLetterUrl = LETTER_BASE_URL & "/letter/?case_encounter=" & UrlEnc(NzS(caseEncounter)) & _
-                     "&policy_id=" & UrlEnc(NzS(policyId)) & _
-                     "&member_name=" & UrlEnc(NzS(memberName)) & _
-                     "&dob=" & UrlEnc(FormatDob(dob)) & _
-                     "&admission=" & UrlEnc(NzS(admission)) & _
-                     "&folder_name=" & UrlEnc(NzS(folderName)) & _
-                     "&user=" & UrlEnc(Environ("USERNAME"))
+' ===========================================================================
+' Hand the values to the server; get back a token link
+' ===========================================================================
+
+Private Function RequestHandoffUrl(ByVal caseEncounter As Variant, ByVal policyId As Variant, _
+                                   ByVal memberName As Variant, ByVal dob As Variant, _
+                                   ByVal admission As Variant, ByVal folderName As Variant) As String
+    Dim http As Object, body As String
+    body = "case_encounter=" & UrlEnc(NzS(caseEncounter)) & _
+           "&policy_id=" & UrlEnc(NzS(policyId)) & _
+           "&member_name=" & UrlEnc(NzS(memberName)) & _
+           "&dob=" & UrlEnc(FormatDob(dob)) & _
+           "&admission=" & UrlEnc(NzS(admission)) & _
+           "&folder_name=" & UrlEnc(NzS(folderName)) & _
+           "&user=" & UrlEnc(Environ("USERNAME"))
+    On Error GoTo Failed
+    Set http = CreateObject("WinHttp.WinHttpRequest.5.1")
+    http.SetTimeouts 5000, 5000, 10000, 10000
+    http.Open "POST", LETTER_BASE_URL & "/letter/handoff/", False
+    http.SetRequestHeader "Content-Type", "application/x-www-form-urlencoded"
+    http.Send body
+    If http.Status = 200 Then
+        RequestHandoffUrl = Trim$(http.ResponseText)
+        Exit Function
+    End If
+    MsgBox "The letter server answered HTTP " & http.Status & " (" & http.StatusText & ").", vbExclamation, "Clinicals Request"
+    Exit Function
+Failed:
+    MsgBox "Cannot reach the letter server at " & LETTER_BASE_URL & vbCrLf & vbCrLf & _
+           "Make sure run.bat is running on the server and the address in LETTER_BASE_URL is correct." & _
+           vbCrLf & vbCrLf & Err.Description, vbExclamation, "Clinicals Request"
 End Function
 
 ' ===========================================================================
-' Edge "app" window
+' Dialog-style browser window
 ' ===========================================================================
 
-' Starts Edge in --app mode (no address bar or tabs) sized and centred like a
-' dialog. A private profile folder keeps the window in its own process, which
-' is what makes waiting for it possible. Returns the process id, or 0 if Edge
-' was not found (the page is then opened in the default browser instead).
-Private Function LaunchEdgeApp(ByVal url As String) As Double
-    Dim edge As String, profile As String, cmd As String, x As Long, y As Long
-    edge = FindEdge()
-    If Len(edge) = 0 Then
-        OpenInDefaultBrowser url
+' Opens the URL in a NEW, chromeless (no address bar / tabs) window, sized and
+' centred like a dialog. Uses Edge, else Chrome; falls back to the default
+' browser if neither is installed. Returns the process id, or 0.
+Private Function LaunchDialogWindow(ByVal url As String) As Double
+    Dim browser As String, profile As String, cmd As String, x As Long, y As Long
+    browser = FindBrowser()
+    If Len(browser) = 0 Then
+        ShellExecuteW 0, StrPtr("open"), StrPtr(url), 0, 0, SW_SHOWNORMAL
         Exit Function
     End If
+    ' A private profile keeps the window in its own process (so we can wait for it)
     profile = Environ("LOCALAPPDATA") & "\MapInc\LetterDialogProfile"
     x = (GetSystemMetrics(SM_CXSCREEN) - DIALOG_WIDTH) \ 2
     y = (GetSystemMetrics(SM_CYSCREEN) - DIALOG_HEIGHT) \ 2
     If x < 0 Then x = 0
     If y < 0 Then y = 0
-    cmd = """" & edge & """ --app=""" & url & """" & _
+    cmd = """" & browser & """ --new-window --app=""" & url & """" & _
           " --window-size=" & DIALOG_WIDTH & "," & DIALOG_HEIGHT & _
           " --window-position=" & x & "," & y & _
           " --user-data-dir=""" & profile & """ --no-first-run --no-default-browser-check"
-    LaunchEdgeApp = Shell(cmd, vbNormalFocus)
+    LaunchDialogWindow = Shell(cmd, vbNormalFocus)
 End Function
 
-Private Function FindEdge() As String
-    Dim candidates As Variant, i As Integer
+' Edge (registry App Paths, then the usual folders), then Chrome.
+Private Function FindBrowser() As String
+    Dim candidates As Variant, i As Integer, p As String
+    p = RegReadSafe("HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe\")
+    If Len(p) > 0 Then If Len(Dir(p)) > 0 Then FindBrowser = p: Exit Function
     candidates = Array("C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe", _
-                       "C:\Program Files\Microsoft\Edge\Application\msedge.exe")
+                       "C:\Program Files\Microsoft\Edge\Application\msedge.exe", _
+                       Environ("LOCALAPPDATA") & "\Microsoft\Edge\Application\msedge.exe", _
+                       "C:\Program Files\Google\Chrome\Application\chrome.exe", _
+                       "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe", _
+                       Environ("LOCALAPPDATA") & "\Google\Chrome\Application\chrome.exe")
     For i = LBound(candidates) To UBound(candidates)
-        If Len(Dir(candidates(i))) > 0 Then
-            FindEdge = candidates(i)
-            Exit Function
-        End If
+        If Len(Dir(candidates(i))) > 0 Then FindBrowser = candidates(i): Exit Function
     Next i
 End Function
 
-Private Sub OpenInDefaultBrowser(ByVal url As String)
-    ShellExecuteW 0, StrPtr("open"), StrPtr(url), 0, 0, SW_SHOWNORMAL
-End Sub
+Private Function RegReadSafe(ByVal key As String) As String
+    On Error Resume Next
+    RegReadSafe = CreateObject("WScript.Shell").RegRead(key)
+End Function
 
 ' Blocks (while keeping Outlook responsive) until the process exits.
 Private Sub WaitForProcess(ByVal pid As Double)
@@ -173,7 +204,7 @@ Private Function FormatDob(ByVal dob As Variant) As String
     End If
 End Function
 
-' Percent-encodes a string as UTF-8 for use in a query string.
+' Percent-encodes a string as UTF-8 for use in a query string / form body.
 Public Function UrlEnc(ByVal s As String) As String
     Dim bytes() As Byte, i As Long, out As String
     If Len(s) = 0 Then Exit Function

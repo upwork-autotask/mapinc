@@ -5,21 +5,19 @@ Option Explicit
 ' ---------------------------------------------------------------------------
 ' MAP Inc "Clinicals Request" launcher for MS Access.
 '
-' Import this module (File > Import in the VBA editor), set LETTER_BASE_URL,
-' then from a button on your case form call ONE of:
+' Install: VBA editor > File > Import File... > this .bas file, then set
+' LETTER_BASE_URL below. From a button on your case form call:
 '
 '   OpenClinicalsLetterDialog Me.CaseEncounter, Me.PolicyID, Me.MemberName, Me.DOB, Me.Admission, Me.FolderName
-'       Opens a chromeless Edge window sized like a dialog and WAITS until the
-'       user closes it, so the code after the call runs when the letter is done.
 '
-'   OpenClinicalsLetter Me.CaseEncounter, Me.PolicyID, Me.MemberName, Me.DOB, Me.Admission, Me.FolderName
-'       Same window, but returns immediately (non-blocking).
+' For a TRUE Access modal dialog (Microsoft 365 Access, build 2303 or newer),
+' see OpenClinicalsLetterInAccessForm at the bottom of this module.
 '
-'   For a TRUE Access modal dialog (Microsoft 365 Access, build 2303 or newer),
-'   see OpenClinicalsLetterInAccessForm at the bottom of this module.
-'
-' The folder name is the sub-folder under the PDF root configured in the web
-' app's Settings page. The Windows user name is sent automatically.
+' How it works: the values are POSTed to the server, which answers with a
+' short-lived link (…/letter/?t=<token>) — so no patient data ever appears in
+' a URL, window title or browser history. That link is opened in a NEW,
+' chromeless Edge window sized like a dialog. OpenClinicalsLetterDialog waits
+' until that window is closed; OpenClinicalsLetter returns immediately.
 ' ---------------------------------------------------------------------------
 
 Private Const LETTER_BASE_URL As String = "http://SERVER-NAME:8000"   ' <-- server running run.bat
@@ -33,88 +31,138 @@ Private Const DIALOG_HEIGHT As Long = 720
     Private Declare PtrSafe Function WaitForSingleObject Lib "kernel32" (ByVal hHandle As LongPtr, ByVal dwMilliseconds As Long) As Long
     Private Declare PtrSafe Function CloseHandle Lib "kernel32" (ByVal hObject As LongPtr) As Long
     Private Declare PtrSafe Function GetSystemMetrics Lib "user32" (ByVal nIndex As Long) As Long
+    Private Declare PtrSafe Function ShellExecuteW Lib "shell32" (ByVal hwnd As LongPtr, ByVal lpOperation As LongPtr, ByVal lpFile As LongPtr, ByVal lpParameters As LongPtr, ByVal lpDirectory As LongPtr, ByVal nShowCmd As Long) As LongPtr
 #Else
     Private Declare Function OpenProcess Lib "kernel32" (ByVal dwDesiredAccess As Long, ByVal bInheritHandle As Long, ByVal dwProcessId As Long) As Long
     Private Declare Function WaitForSingleObject Lib "kernel32" (ByVal hHandle As Long, ByVal dwMilliseconds As Long) As Long
     Private Declare Function CloseHandle Lib "kernel32" (ByVal hObject As Long) As Long
     Private Declare Function GetSystemMetrics Lib "user32" (ByVal nIndex As Long) As Long
+    Private Declare Function ShellExecuteW Lib "shell32" (ByVal hwnd As Long, ByVal lpOperation As Long, ByVal lpFile As Long, ByVal lpParameters As Long, ByVal lpDirectory As Long, ByVal nShowCmd As Long) As Long
 #End If
 
 Private Const SYNCHRONIZE As Long = &H100000
 Private Const WAIT_TIMEOUT As Long = &H102
 Private Const SM_CXSCREEN As Long = 0
 Private Const SM_CYSCREEN As Long = 1
+Private Const SW_SHOWNORMAL As Long = 1
 
 ' ===========================================================================
 ' Public entry points
 ' ===========================================================================
 
-' Opens the letter form in a dialog-sized Edge window and waits until it is closed.
+' Example macro for a ribbon button: asks for the values, then opens the dialog.
+Public Sub OpenLetterFromPrompt()
+    Dim caseEncounter As String, policyId As String, memberName As String
+    Dim dob As String, admission As String, folderName As String
+    caseEncounter = InputBox("Case / Encounter number:", "Clinicals Request")
+    If Len(caseEncounter) = 0 Then Exit Sub
+    policyId = InputBox("Policy ID No.:", "Clinicals Request")
+    memberName = InputBox("Member name:", "Clinicals Request")
+    dob = InputBox("Date of birth (m/d/yyyy):", "Clinicals Request")
+    admission = InputBox("Admission (date or status):", "Clinicals Request")
+    folderName = InputBox("Folder name (sub-folder under the PDF root):", "Clinicals Request", memberName)
+    OpenClinicalsLetterDialog caseEncounter, policyId, memberName, dob, admission, folderName
+End Sub
+
+' Opens the letter form in a new dialog-sized window and waits until it is closed.
 Public Sub OpenClinicalsLetterDialog(ByVal caseEncounter As Variant, ByVal policyId As Variant, _
                                      ByVal memberName As Variant, ByVal dob As Variant, _
                                      ByVal admission As Variant, ByVal folderName As Variant)
-    Dim pid As Double
-    pid = LaunchEdgeApp(BuildLetterUrl(caseEncounter, policyId, memberName, dob, admission, folderName))
+    Dim url As String, pid As Double
+    url = RequestHandoffUrl(caseEncounter, policyId, memberName, dob, admission, folderName)
+    If Len(url) = 0 Then Exit Sub
+    pid = LaunchDialogWindow(url)
     If pid > 0 Then WaitForProcess pid
 End Sub
 
-' Opens the letter form in a dialog-sized Edge window and returns immediately.
+' Opens the letter form in a new dialog-sized window and returns immediately.
 Public Sub OpenClinicalsLetter(ByVal caseEncounter As Variant, ByVal policyId As Variant, _
                                ByVal memberName As Variant, ByVal dob As Variant, _
                                ByVal admission As Variant, ByVal folderName As Variant)
-    LaunchEdgeApp BuildLetterUrl(caseEncounter, policyId, memberName, dob, admission, folderName)
+    Dim url As String
+    url = RequestHandoffUrl(caseEncounter, policyId, memberName, dob, admission, folderName)
+    If Len(url) > 0 Then LaunchDialogWindow url
 End Sub
 
-' Builds the pre-filled URL (also useful for the Access-form approach below).
-Public Function BuildLetterUrl(ByVal caseEncounter As Variant, ByVal policyId As Variant, _
-                               ByVal memberName As Variant, ByVal dob As Variant, _
-                               ByVal admission As Variant, ByVal folderName As Variant) As String
-    BuildLetterUrl = LETTER_BASE_URL & "/letter/?case_encounter=" & UrlEnc(Nz(caseEncounter, "")) & _
-                     "&policy_id=" & UrlEnc(Nz(policyId, "")) & _
-                     "&member_name=" & UrlEnc(Nz(memberName, "")) & _
-                     "&dob=" & UrlEnc(FormatDob(dob)) & _
-                     "&admission=" & UrlEnc(Nz(admission, "")) & _
-                     "&folder_name=" & UrlEnc(Nz(folderName, "")) & _
-                     "&user=" & UrlEnc(Environ("USERNAME"))
+' ===========================================================================
+' Hand the values to the server; get back a token link
+' ===========================================================================
+
+Private Function RequestHandoffUrl(ByVal caseEncounter As Variant, ByVal policyId As Variant, _
+                                   ByVal memberName As Variant, ByVal dob As Variant, _
+                                   ByVal admission As Variant, ByVal folderName As Variant) As String
+    Dim http As Object, body As String
+    body = "case_encounter=" & UrlEnc(NzS(caseEncounter)) & _
+           "&policy_id=" & UrlEnc(NzS(policyId)) & _
+           "&member_name=" & UrlEnc(NzS(memberName)) & _
+           "&dob=" & UrlEnc(FormatDob(dob)) & _
+           "&admission=" & UrlEnc(NzS(admission)) & _
+           "&folder_name=" & UrlEnc(NzS(folderName)) & _
+           "&user=" & UrlEnc(Environ("USERNAME"))
+    On Error GoTo Failed
+    Set http = CreateObject("WinHttp.WinHttpRequest.5.1")
+    http.SetTimeouts 5000, 5000, 10000, 10000
+    http.Open "POST", LETTER_BASE_URL & "/letter/handoff/", False
+    http.SetRequestHeader "Content-Type", "application/x-www-form-urlencoded"
+    http.Send body
+    If http.Status = 200 Then
+        RequestHandoffUrl = Trim$(http.ResponseText)
+        Exit Function
+    End If
+    MsgBox "The letter server answered HTTP " & http.Status & " (" & http.StatusText & ").", vbExclamation, "Clinicals Request"
+    Exit Function
+Failed:
+    MsgBox "Cannot reach the letter server at " & LETTER_BASE_URL & vbCrLf & vbCrLf & _
+           "Make sure run.bat is running on the server and the address in LETTER_BASE_URL is correct." & _
+           vbCrLf & vbCrLf & Err.Description, vbExclamation, "Clinicals Request"
 End Function
 
 ' ===========================================================================
-' Edge "app" window
+' Dialog-style browser window
 ' ===========================================================================
 
-' Starts Edge in --app mode (no address bar or tabs) sized and centred like a
-' dialog. A private profile folder keeps the window in its own process, which
-' is what makes waiting for it possible. Returns the process id, or 0 if Edge
-' was not found (the page is then opened in the default browser instead).
-Private Function LaunchEdgeApp(ByVal url As String) As Double
-    Dim edge As String, profile As String, cmd As String, x As Long, y As Long
-    edge = FindEdge()
-    If Len(edge) = 0 Then
-        Application.FollowHyperlink url
+' Opens the URL in a NEW, chromeless (no address bar / tabs) window, sized and
+' centred like a dialog. Uses Edge, else Chrome; falls back to the default
+' browser if neither is installed. Returns the process id, or 0.
+Private Function LaunchDialogWindow(ByVal url As String) As Double
+    Dim browser As String, profile As String, cmd As String, x As Long, y As Long
+    browser = FindBrowser()
+    If Len(browser) = 0 Then
+        ShellExecuteW 0, StrPtr("open"), StrPtr(url), 0, 0, SW_SHOWNORMAL
         Exit Function
     End If
+    ' A private profile keeps the window in its own process (so we can wait for it)
     profile = Environ("LOCALAPPDATA") & "\MapInc\LetterDialogProfile"
     x = (GetSystemMetrics(SM_CXSCREEN) - DIALOG_WIDTH) \ 2
     y = (GetSystemMetrics(SM_CYSCREEN) - DIALOG_HEIGHT) \ 2
     If x < 0 Then x = 0
     If y < 0 Then y = 0
-    cmd = """" & edge & """ --app=""" & url & """" & _
+    cmd = """" & browser & """ --new-window --app=""" & url & """" & _
           " --window-size=" & DIALOG_WIDTH & "," & DIALOG_HEIGHT & _
           " --window-position=" & x & "," & y & _
           " --user-data-dir=""" & profile & """ --no-first-run --no-default-browser-check"
-    LaunchEdgeApp = Shell(cmd, vbNormalFocus)
+    LaunchDialogWindow = Shell(cmd, vbNormalFocus)
 End Function
 
-Private Function FindEdge() As String
-    Dim candidates As Variant, i As Integer
+' Edge (registry App Paths, then the usual folders), then Chrome.
+Private Function FindBrowser() As String
+    Dim candidates As Variant, i As Integer, p As String
+    p = RegReadSafe("HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe\")
+    If Len(p) > 0 Then If Len(Dir(p)) > 0 Then FindBrowser = p: Exit Function
     candidates = Array("C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe", _
-                       "C:\Program Files\Microsoft\Edge\Application\msedge.exe")
+                       "C:\Program Files\Microsoft\Edge\Application\msedge.exe", _
+                       Environ("LOCALAPPDATA") & "\Microsoft\Edge\Application\msedge.exe", _
+                       "C:\Program Files\Google\Chrome\Application\chrome.exe", _
+                       "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe", _
+                       Environ("LOCALAPPDATA") & "\Google\Chrome\Application\chrome.exe")
     For i = LBound(candidates) To UBound(candidates)
-        If Len(Dir(candidates(i))) > 0 Then
-            FindEdge = candidates(i)
-            Exit Function
-        End If
+        If Len(Dir(candidates(i))) > 0 Then FindBrowser = candidates(i): Exit Function
     Next i
+End Function
+
+Private Function RegReadSafe(ByVal key As String) As String
+    On Error Resume Next
+    RegReadSafe = CreateObject("WScript.Shell").RegRead(key)
 End Function
 
 ' Blocks (while keeping Access responsive) until the process exits.
@@ -136,15 +184,24 @@ End Sub
 ' Helpers
 ' ===========================================================================
 
-Private Function FormatDob(ByVal dob As Variant) As String
-    If IsDate(dob) Then
-        FormatDob = Format(dob, "yyyy-mm-dd")
+' Null/Empty-safe string (replacement for Access's Nz).
+Private Function NzS(ByVal v As Variant) As String
+    If IsNull(v) Or IsEmpty(v) Or IsMissing(v) Then
+        NzS = ""
     Else
-        FormatDob = Nz(dob, "")
+        NzS = Trim$(CStr(v))
     End If
 End Function
 
-' Percent-encodes a string as UTF-8 for use in a query string.
+Private Function FormatDob(ByVal dob As Variant) As String
+    If IsDate(dob) Then
+        FormatDob = Format(CDate(dob), "yyyy-mm-dd")
+    Else
+        FormatDob = NzS(dob)
+    End If
+End Function
+
+' Percent-encodes a string as UTF-8 for use in a query string / form body.
 Public Function UrlEnc(ByVal s As String) As String
     Dim bytes() As Byte, i As Long, out As String
     If Len(s) = 0 Then Exit Function
@@ -205,6 +262,7 @@ End Function
 Public Sub OpenClinicalsLetterInAccessForm(ByVal caseEncounter As Variant, ByVal policyId As Variant, _
                                            ByVal memberName As Variant, ByVal dob As Variant, _
                                            ByVal admission As Variant, ByVal folderName As Variant)
-    DoCmd.OpenForm "frmLetterDialog", acNormal, , , , acDialog, _
-                   BuildLetterUrl(caseEncounter, policyId, memberName, dob, admission, folderName)
+    Dim url As String
+    url = RequestHandoffUrl(caseEncounter, policyId, memberName, dob, admission, folderName)
+    If Len(url) > 0 Then DoCmd.OpenForm "frmLetterDialog", acNormal, , , , acDialog, url
 End Sub
