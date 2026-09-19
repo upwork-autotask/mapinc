@@ -21,11 +21,46 @@ python manage.py migrate
 python manage.py createsuperuser
 python manage.py load_default_template
 ```
-Start the server with `run.bat` (port 8000), open `http://<server>:8000/admin/`,
-log in, and in **Settings** set the **PDF root folder** (e.g. `\\server\claims`).
-Defaults for ATTN / Client / Doctor, the filename pattern and the Word template
-are also edited there. **Letters** lists every generated letter with who created
-and last modified it, an *Open PDF* link and a *Regenerate PDF* action.
+## Starting the server
+Double-click **`run.bat`** (or run it from a console). It activates the virtualenv,
+applies any pending database migrations, and serves the app on port 8000 for every
+network interface. Leave the window open — closing it stops the server.
+
+```powershell
+cd C:\path\to\mapinc
+.\run.bat
+```
+Expected output ends with `INFO:waitress:Serving on http://0.0.0.0:8000`.
+
+Then open:
+
+| Page | URL |
+|---|---|
+| Letter form (what Access opens) | `http://<server>:8000/letter/` |
+| Login | `http://<server>:8000/login/` |
+| Settings — defaults, **PDF root folder**, filename pattern, Word template | `http://<server>:8000/settings/` |
+| Letters — history, search, Open PDF, Edit | `http://<server>:8000/letters/` |
+| Django admin — users, Regenerate PDF action | `http://<server>:8000/admin/` |
+
+`<server>` is `localhost` on the machine itself, or the server's name / IP from
+other PCs on the LAN (allow TCP 8000 through Windows Firewall for that).
+
+Before the first letter: log in and set the **PDF root folder** in Settings
+(e.g. `\\server\claims`).
+
+**Stopping:** press `Ctrl+C` in the `run.bat` window, or close it.
+
+**Developer mode** (auto-reloads code and templates on save, port 8000):
+```powershell
+.\.venv\Scripts\Activate.ps1
+python manage.py runserver
+```
+
+**Troubleshooting**
+- *"Database migration failed"* — PostgreSQL is not running or `mapinc.ini` has the wrong host/user/password.
+- *"Missing mapinc.ini"* — copy `mapinc.ini.example` to `mapinc.ini` (see First-time setup).
+- *Port already in use* — another copy is running; find it with `netstat -ano | findstr :8000` and stop it, or change the port in `run.bat`.
+- *PDF not created / "Word did not finish"* — the account running `run.bat` must be able to start Microsoft Word; check `pdf_converter` and `word_timeout_seconds` in `mapinc.ini`.
 
 ## Using it from Access
 Import `access/LetterLauncher.bas`, set `LETTER_BASE_URL`, and call
