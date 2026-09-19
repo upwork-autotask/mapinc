@@ -1,37 +1,15 @@
-from django import forms
 from django.contrib import admin, messages
-from django.db.models.fields.files import FieldFile
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.html import format_html
 
 from .docgen.service import LetterGenerationError, generate_letter
-from .docgen.template_fill import missing_bindings
+from .forms import AppSettingsForm
 from .models import AppSettings, Letter
 
 admin.site.site_header = "MAP Inc – Clinicals Request"
 admin.site.site_title = "MAP Inc"
 admin.site.index_title = "Administration"
-
-
-class AppSettingsForm(forms.ModelForm):
-    class Meta:
-        model = AppSettings
-        fields = "__all__"
-
-    def clean_template(self):
-        upload = self.cleaned_data.get("template")
-        if upload and not isinstance(upload, FieldFile):  # a new file, not the stored one
-            data = upload.read()
-            upload.seek(0)
-            try:
-                missing = missing_bindings(data)
-            except Exception as exc:  # noqa: BLE001 - not a readable .docx
-                raise forms.ValidationError(f"Not a valid Word .docx file ({exc}).") from exc
-            if missing:
-                raise forms.ValidationError(
-                    "Template is missing content controls bound to: " + ", ".join(sorted(missing)))
-        return upload
 
 
 @admin.register(AppSettings)

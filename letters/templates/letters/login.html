@@ -1,0 +1,26 @@
+{% extends "letters/base.html" %}
+
+{% block title %}Login{% endblock %}
+{% block heading %}Login{% endblock %}
+{% block status %}Sign in to manage settings and letter history{% endblock %}
+{% block login_button %}{% endblock %}
+
+{% block content %}
+  <form method="post" class="detail" novalidate>
+    {% csrf_token %}
+    {% if form.errors %}<div class="msgbar">Your user name and password did not match. Please try again.</div>{% endif %}
+    <div class="row">
+      <label for="{{ form.username.id_for_label }}">User name:</label>
+      {{ form.username }}
+    </div>
+    <div class="row">
+      <label for="{{ form.password.id_for_label }}">Password:</label>
+      {{ form.password }}
+    </div>
+    <input type="hidden" name="next" value="{{ next }}">
+    <div class="buttons">
+      <button type="submit" class="default">Log in</button>
+      <a class="button" href="{% url 'letter_form' %}">Cancel</a>
+    </div>
+  </form>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "letters/base.html" %}
+
+{% block title %}Settings{% endblock %}
+{% block heading %}Settings{% endblock %}
+{% block card_class %}wide{% endblock %}
+{% block status %}Changes apply to the next letter generated{% endblock %}
+
+{% block content %}
+  <form method="post" enctype="multipart/form-data" class="detail" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="msgbar">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+    {% for title, fields in groups %}
+      <div class="group">{{ title }}</div>
+      {% for field in fields %}
+        <div class="row{% if field.errors %} has-error{% endif %}">
+          <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
+          {{ field }}
+          {% if field.name == "template" %}
+            <div class="help">Current file: {{ app_settings.template.name|cut:"templates/"|default:"none uploaded" }}. Choose a .docx to replace it; it must keep the seven bound content controls.</div>
+          {% elif field.help_text %}<div class="help">{{ field.help_text }}</div>{% endif %}
+          {% if field.errors %}<div class="error">{{ field.errors|join:" " }}</div>{% endif %}
+        </div>
+      {% endfor %}
+    {% endfor %}
+    <div class="buttons">
+      <button type="submit" class="default">Save</button>
+      <a class="button" href="{% url 'letter_form' %}">Cancel</a>
+    </div>
+  </form>
+{% endblock %}

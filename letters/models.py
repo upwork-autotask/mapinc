@@ -12,7 +12,7 @@ class AppSettings(models.Model):
                                       help_text='Printed after "Dr." in the letter.')
     pdf_root_folder = models.CharField(
         "PDF root folder", max_length=500, blank=True,
-        help_text=r"Local or UNC path, e.g. \server\claims. Access passes the sub-folder name.")
+        help_text=r"Local or UNC path, e.g. \\server\claims. Access passes the sub-folder name.")
     pdf_filename_pattern = models.CharField(
         "PDF filename pattern", max_length=200, default=DEFAULT_FILENAME_PATTERN,
         help_text="Placeholders: {member_name} {policy_id} {case_encounter} {MMDDYY} {YYYYMMDD}")

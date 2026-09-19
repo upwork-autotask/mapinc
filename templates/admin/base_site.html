@@ -1,0 +1,20 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | MAP Inc{% endblock %}
+
+{% block extrastyle %}
+<link rel="icon" href="{% static 'letters/map_logo.jpg' %}">
+<style>
+  #header { background: #1b2a6b; padding: 8px 40px; }
+  #branding h1, #site-name { margin: 0; line-height: 0; }
+  .brand-logo { height: 72px; width: auto; display: block; }
+  #user-tools a { border-bottom-color: rgba(255,255,255,.5); }
+</style>
+{% endblock %}
+
+{% block branding %}
+<div id="site-name"><a href="{% url 'admin:index' %}"><img class="brand-logo" src="{% static 'letters/map_logo.jpg' %}" alt="MAP - Medical Audit Professionals, Inc"></a></div>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}

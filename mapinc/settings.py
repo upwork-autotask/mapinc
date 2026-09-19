@@ -51,7 +51,7 @@ ROOT_URLCONF = "mapinc.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -91,6 +91,10 @@ MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "settings"
+LOGOUT_REDIRECT_URL = "letter_form"
 
 # Serve /static/ from the app's static dirs without a collectstatic step (tiny LAN app).
 WHITENOISE_USE_FINDERS = True

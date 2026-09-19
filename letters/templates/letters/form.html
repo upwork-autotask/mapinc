@@ -1,16 +1,6 @@
-{% load static %}<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Clinicals Request</title>
-<link rel="stylesheet" href="{% static 'letters/access.css' %}">
-<link rel="icon" href="{% static 'letters/map_logo.jpg' %}">
-</head>
-<body>
-<div class="access-form">
-  <div class="brand"><img src="{% static 'letters/map_logo.jpg' %}" alt="MAP - Medical Audit Professionals, Inc"></div>
-  <div class="titlebar">Clinicals Request</div>
+{% extends "letters/base.html" %}
+
+{% block content %}
   <form method="post" class="detail" novalidate>
     {% csrf_token %}
     {% if form.non_field_errors %}<div class="msgbar">{{ form.non_field_errors|join:" " }}</div>{% endif %}
@@ -34,8 +24,9 @@
       <button type="button" onclick="window.close()">Cancel</button>
     </div>
   </form>
-  <div class="statusbar">Form View</div>
-</div>
+{% endblock %}
+
+{% block scripts %}
 <script>
   // Enter in any text box submits (Access behaviour); the first empty box gets focus.
   document.querySelectorAll('.detail input[type=text]').forEach(function (el) {
@@ -44,5 +35,4 @@
   var first = Array.prototype.find.call(document.querySelectorAll('.detail input:not([type=hidden])'), function (el) { return !el.value; });
   (first || document.querySelector('.detail input:not([type=hidden])')).focus();
 </script>
-</body>
-</html>
+{% endblock %}

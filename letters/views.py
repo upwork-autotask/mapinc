@@ -1,12 +1,15 @@
 from pathlib import Path
 
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.http import FileResponse, Http404
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
 from .docgen.service import LetterGenerationError, generate_letter
-from .forms import LetterForm
+from .forms import AppSettingsForm, LetterForm
 from .models import AppSettings, Letter
 
 QUERY_FIELDS = ("case_encounter", "policy_id", "member_name", "dob", "admission", "folder_name", "user")
@@ -58,3 +61,32 @@ def letter_pdf(request, case_encounter: str):
     if path is None or not path.is_file():
         raise Http404("PDF not found")
     return FileResponse(open(path, "rb"), content_type="application/pdf", filename=path.name)
+
+
+SETTINGS_GROUPS = (
+    ("Letter defaults", ("attn_default", "client_default", "doctor_default")),
+    ("PDF output", ("pdf_root_folder", "pdf_filename_pattern")),
+    ("Word template", ("template",)),
+)
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def settings_page(request):
+    app_settings = AppSettings.load()
+    if request.method == "POST":
+        form = AppSettingsForm(request.POST, request.FILES, instance=app_settings)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Settings saved.")
+            return redirect("settings")
+    else:
+        form = AppSettingsForm(instance=app_settings)
+    groups = [(title, [form[name] for name in names]) for title, names in SETTINGS_GROUPS]
+    return render(request, "letters/settings.html",
+                  {"form": form, "groups": groups, "app_settings": app_settings})
+
+
+def admin_login_redirect(request):
+    """Send the Django admin's login to the branded /login/ page, keeping ?next=."""
+    return redirect(f"{reverse('login')}?next={request.GET.get('next', reverse('admin:index'))}")

@@ -1,0 +1,33 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Clinicals Request{% endblock %} – MAP Inc</title>
+<link rel="stylesheet" href="{% static 'letters/access.css' %}">
+<link rel="icon" href="{% static 'letters/map_logo.jpg' %}">
+</head>
+<body>
+<div class="access-form {% block card_class %}{% endblock %}">
+  <div class="brand"><a href="{% url 'letter_form' %}"><img src="{% static 'letters/map_logo.jpg' %}" alt="MAP - Medical Audit Professionals, Inc"></a></div>
+  <div class="titlebar">
+    <span>{% block heading %}Clinicals Request{% endblock %}</span>
+    <nav class="nav">
+      {% if request.user.is_authenticated %}
+        <a href="{% url 'letter_form' %}">Letter</a>
+        <a href="{% url 'settings' %}">Settings</a>
+        <a href="{% url 'admin:letters_letter_changelist' %}">Letters</a>
+        <a href="{% url 'admin:auth_user_changelist' %}">Users</a>
+        <form method="post" action="{% url 'logout' %}" class="inline">{% csrf_token %}<button type="submit" class="link" title="Signed in as {{ request.user.username }}">Logout</button></form>
+      {% else %}
+        {% block login_button %}<a class="button small" href="{% url 'login' %}?next={% url 'settings' %}">Login</a>{% endblock %}
+      {% endif %}
+    </nav>
+  </div>
+  {% for message in messages %}<div class="msgbar {{ message.tags }}">{{ message }}</div>{% endfor %}
+  {% block content %}{% endblock %}
+  <div class="statusbar">{% block status %}Form View{% endblock %}</div>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>
