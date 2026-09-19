@@ -10,4 +10,5 @@ urlpatterns = [
                                                 redirect_authenticated_user=True), name="login"),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("settings/", views.settings_page, name="settings"),
+    path("letters/", views.letter_list, name="letter_list"),
 ]

@@ -3,6 +3,8 @@ from pathlib import Path
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
+from django.db.models import Q
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -90,3 +92,18 @@ def settings_page(request):
 def admin_login_redirect(request):
     """Send the Django admin's login to the branded /login/ page, keeping ?next=."""
     return redirect(f"{reverse('login')}?next={request.GET.get('next', reverse('admin:index'))}")
+
+
+LIST_PAGE_SIZE = 25
+
+
+@login_required
+def letter_list(request):
+    """History of generated letters, newest change first, with a simple search box."""
+    q = request.GET.get("q", "").strip()
+    letters = Letter.objects.all()
+    if q:
+        letters = letters.filter(
+            Q(case_encounter__icontains=q) | Q(policy_id__icontains=q) | Q(member_name__icontains=q))
+    page = Paginator(letters, LIST_PAGE_SIZE).get_page(request.GET.get("page"))
+    return render(request, "letters/list.html", {"page": page, "q": q, "total": page.paginator.count})

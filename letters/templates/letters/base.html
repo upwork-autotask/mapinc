@@ -16,7 +16,7 @@
       {% if request.user.is_authenticated %}
         <a href="{% url 'letter_form' %}">Letter</a>
         <a href="{% url 'settings' %}">Settings</a>
-        <a href="{% url 'admin:letters_letter_changelist' %}">Letters</a>
+        <a href="{% url 'letter_list' %}">Letters</a>
         <a href="{% url 'admin:auth_user_changelist' %}">Users</a>
         <form method="post" action="{% url 'logout' %}" class="inline">{% csrf_token %}<button type="submit" class="small" title="Signed in as {{ request.user.username }}">Logout</button></form>
       {% else %}
