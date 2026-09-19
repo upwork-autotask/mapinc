@@ -97,3 +97,39 @@ class Handoff(models.Model):
         """The stashed values, or None if the token is unknown or older than TTL."""
         row = cls.objects.filter(token=token, created_at__gte=timezone.now() - cls.TTL).first()
         return dict(row.data) if row else None
+
+
+class AuditEvent(models.Model):
+    """
+    Insert-only trail of who did what with patient data (HIPAA audit controls).
+    `user` is the authenticated app/Windows account; `windows_user` is the name
+    the Access/Outlook launcher supplied (self-reported unless auth_mode=remote_user).
+    """
+
+    class Action(models.TextChoices):
+        FORM_OPENED = "form_opened", "Letter form opened"
+        LETTER_CREATED = "letter_created", "Letter created"
+        LETTER_UPDATED = "letter_updated", "Letter updated"
+        LETTER_FAILED = "letter_failed", "Letter generation failed"
+        PDF_DOWNLOADED = "pdf_downloaded", "PDF downloaded"
+        PDF_REGENERATED = "pdf_regenerated", "PDF regenerated"
+        LIST_VIEWED = "list_viewed", "Letters list viewed"
+        SETTINGS_CHANGED = "settings_changed", "Settings changed"
+        LOGIN = "login", "Login"
+        LOGOUT = "logout", "Logout"
+        LOGIN_FAILED = "login_failed", "Login failed"
+        LOCKOUT = "lockout", "Account locked out"
+
+    at = models.DateTimeField(auto_now_add=True, db_index=True)
+    user = models.CharField(max_length=150, blank=True, db_index=True)
+    windows_user = models.CharField(max_length=150, blank=True)
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    action = models.CharField(max_length=32, choices=Action.choices, db_index=True)
+    case_encounter = models.CharField(max_length=100, blank=True, db_index=True)
+    detail = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        ordering = ["-at", "-id"]
+
+    def __str__(self):
+        return f"{self.at:%Y-%m-%d %H:%M} {self.user or self.windows_user} {self.action} {self.case_encounter}"

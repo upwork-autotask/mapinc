@@ -1,0 +1,57 @@
+{% extends "letters/base.html" %}
+
+{% block title %}Audit log{% endblock %}
+{% block heading %}Audit log{% endblock %}
+{% block card_class %}xwide{% endblock %}
+{% block status %}Datasheet View &middot; {{ total }} event{{ total|pluralize }} &middot; read-only{% endblock %}
+
+{% block content %}
+  <div class="detail">
+    <form method="get" class="toolbar">
+      <label for="from">From:</label><input type="date" id="from" name="from" value="{{ filters.from }}">
+      <label for="to">To:</label><input type="date" id="to" name="to" value="{{ filters.to }}">
+      <label for="user">User:</label><input type="text" id="user" name="user" value="{{ filters.user }}" style="width:120px" autocomplete="off">
+      <label for="action">Action:</label>
+      <select id="action" name="action">
+        <option value="">(all)</option>
+        {% for value, label in actions %}<option value="{{ value }}"{% if value == filters.action %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <label for="q">Case:</label><input type="text" id="q" name="q" value="{{ filters.q }}" style="width:120px" autocomplete="off">
+      <button type="submit">Search</button>
+      <a class="button" href="{% url 'audit_log' %}">Clear</a>
+      <a class="button" href="{% url 'audit_log' %}?{{ querystring }}{% if querystring %}&amp;{% endif %}format=csv">Export CSV</a>
+      <span class="count">{{ total }} event{{ total|pluralize }}</span>
+    </form>
+
+    <div class="datasheet-wrap">
+      <table class="datasheet">
+        <thead>
+          <tr><th>When</th><th>User</th><th>Windows user</th><th>IP</th><th>Action</th><th>Case</th><th>Detail</th></tr>
+        </thead>
+        <tbody>
+          {% for e in page.object_list %}
+            <tr>
+              <td>{{ e.at|date:"n/j/Y g:i:s A" }}</td>
+              <td>{{ e.user }}</td>
+              <td class="muted">{{ e.windows_user }}</td>
+              <td class="muted">{{ e.ip|default:"" }}</td>
+              <td>{{ e.get_action_display }}</td>
+              <td>{{ e.case_encounter }}</td>
+              <td class="muted">{{ e.detail }}</td>
+            </tr>
+          {% empty %}
+            <tr><td class="empty" colspan="7">No events match.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if page.paginator.num_pages > 1 %}
+      <div class="pager">
+        {% if page.has_previous %}<a href="?{{ querystring }}&amp;page={{ page.previous_page_number }}">&lsaquo; Previous</a>{% endif %}
+        <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+        {% if page.has_next %}<a href="?{{ querystring }}&amp;page={{ page.next_page_number }}">Next &rsaquo;</a>{% endif %}
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

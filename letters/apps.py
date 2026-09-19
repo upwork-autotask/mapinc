@@ -6,4 +6,4 @@ class LettersConfig(AppConfig):
     name = "letters"
 
     def ready(self):
-        from . import checks  # noqa: F401  registers the production config checks
+        from . import checks, signals  # noqa: F401  registers checks and audit signal handlers

@@ -1,0 +1,14 @@
+{% extends "letters/base.html" %}
+
+{% block title %}Not permitted{% endblock %}
+{% block heading %}Not permitted{% endblock %}
+{% block status %}Access denied{% endblock %}
+
+{% block content %}
+  <div class="detail">
+    <div class="msgbar">Your account ({{ request.user.username }}) is not permitted to open this page. Ask an administrator to grant you staff access.</div>
+    <div class="buttons">
+      <a class="button default" href="{% url 'letter_form' %}">Back to the letter form</a>
+    </div>
+  </div>
+{% endblock %}

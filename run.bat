@@ -5,7 +5,7 @@ cd /d "%~dp0"
 call .venv\Scripts\activate.bat
 python manage.py check
 if errorlevel 1 (
-  echo Configuration check failed - fix mapinc.ini (see messages above) and try again.
+  echo Configuration check failed - fix mapinc.ini as described above and try again.
   pause
   exit /b 1
 )

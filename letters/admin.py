@@ -3,9 +3,10 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.html import format_html
 
+from . import audit
 from .docgen.service import LetterGenerationError, generate_letter
 from .forms import AppSettingsForm
-from .models import AppSettings, Letter
+from .models import AppSettings, AuditEvent, Letter
 
 admin.site.site_header = "MAP Inc – Clinicals Request"
 admin.site.site_title = "MAP Inc"
@@ -58,6 +59,26 @@ class LetterAdmin(admin.ModelAdmin):
             try:
                 generate_letter(data, request.user.get_username())
             except LetterGenerationError as exc:
+                audit.record(request, AuditEvent.Action.LETTER_FAILED,
+                             case_encounter=letter.case_encounter, detail=str(exc))
                 self.message_user(request, f"{letter.case_encounter}: {exc}", messages.ERROR)
             else:
+                audit.record(request, AuditEvent.Action.PDF_REGENERATED, case_encounter=letter.case_encounter)
                 self.message_user(request, f"{letter.case_encounter}: PDF regenerated.", messages.SUCCESS)
+
+
+@admin.register(AuditEvent)
+class AuditEventAdmin(admin.ModelAdmin):
+    list_display = ("at", "user", "windows_user", "ip", "action", "case_encounter", "detail")
+    list_filter = ("action", "at")
+    search_fields = ("user", "windows_user", "case_encounter", "detail")
+    readonly_fields = [f.name for f in AuditEvent._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
