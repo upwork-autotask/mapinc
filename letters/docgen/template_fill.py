@@ -188,3 +188,14 @@ def _pick_run_properties(sdt, content):
     etree.SubElement(rpr, f"{{{W}}}sz").set(f"{{{W}}}val", "30")
     etree.SubElement(rpr, f"{{{W}}}szCs").set(f"{{{W}}}val", "30")
     return rpr
+
+
+def missing_bindings(template_bytes: bytes) -> set[str]:
+    """Field names (see FIELD_BINDINGS) that have no bound content control in the template."""
+    root = etree.fromstring(zipfile.ZipFile(io.BytesIO(template_bytes)).read("word/document.xml"))
+    found = {
+        FIELD_BINDINGS[name]
+        for binding in root.iter(f"{{{W}}}dataBinding")
+        if (name := binding_name(binding.get(f"{{{W}}}xpath"))) in FIELD_BINDINGS
+    }
+    return set(FIELD_BINDINGS.values()) - found
