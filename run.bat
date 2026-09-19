@@ -15,4 +15,6 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-waitress-serve --listen=0.0.0.0:8000 --threads=4 mapinc.wsgi:application
+rem Behind IIS set MAPINC_LISTEN=127.0.0.1:8000 so nothing bypasses the proxy.
+if "%MAPINC_LISTEN%"=="" set MAPINC_LISTEN=0.0.0.0:8000
+waitress-serve --listen=%MAPINC_LISTEN% --threads=4 mapinc.wsgi:application

@@ -137,6 +137,9 @@ AUTH_PASSWORD_VALIDATORS = [
 AXES_FAILURE_LIMIT = _app.getint("lockout_failures", fallback=5)
 AXES_COOLOFF_TIME = timedelta(minutes=_app.getint("lockout_minutes", fallback=15))
 AXES_LOCKOUT_PARAMETERS = ["username"]                # lock the account, whatever the source address
+# W006 warns that username-only lockout can be bypassed by rotating IPs; here it is deliberate so
+# that one bad actor behind the shared office NAT cannot lock out every user at once.
+SILENCED_SYSTEM_CHECKS = ["axes.W006"]
 AXES_RESET_ON_SUCCESS = True
 AXES_LOCKOUT_TEMPLATE = "letters/locked_out.html"
 AXES_ENABLE_ACCESS_FAILURE_LOG = True

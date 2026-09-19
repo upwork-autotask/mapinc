@@ -61,6 +61,7 @@ python manage.py runserver
 - *"Database migration failed"* — PostgreSQL is not running or `mapinc.ini` has the wrong host/user/password.
 - *"Missing mapinc.ini"* — copy `mapinc.ini.example` to `mapinc.ini` (see First-time setup).
 - *Port already in use* — another copy is running; find it with `netstat -ano | findstr :8000` and stop it, or change the port in `run.bat`.
+- *"Configuration check failed"* on start — `production = true` and something in `mapinc.ini` is unsafe; the messages name the key (secret key, allowed_hosts, sslmode, database user, auth_mode, https, allow_query_prefill).
 - *PDF not created / "Word did not finish"* — the account running `run.bat` must be able to start Microsoft Word; check `pdf_converter` and `word_timeout_seconds` in `mapinc.ini`.
 
 ## Using it from Access
@@ -92,6 +93,23 @@ still works for testing (all values editable on the form):
 | `[app] word_timeout_seconds` | kill a hung Word after this many seconds |
 | `[app] allowed_hosts` | comma-separated host names, `*` for any |
 | `[app] debug` | `true` only on a development machine |
+| `[app] production` | `true` on the live server: the app refuses to start unless the settings below are safe |
+| `[app] auth_mode` | `open` (LAN, no login), `login` (app login required), `remote_user` (IIS Windows Authentication) |
+| `[app] https`, `behind_proxy` | set when IIS terminates TLS in front of the app |
+| `[app] session_minutes` | automatic logoff after this many idle minutes (default 30) |
+| `[app] lockout_failures`, `lockout_minutes` | account lockout after failed sign-ins (5 / 15) |
+| `[app] allow_query_prefill` | allow PHI in the URL query string (dev only; launchers use handoff tokens) |
+| `[app] handoff_allowed_networks`, `handoff_minutes` | who may create handoff links and how long they live |
+| `[database] sslmode`, `sslrootcert` | TLS to PostgreSQL (`require` or `verify-full` in production) |
+
+## HIPAA hardening
+The application records an insert-only **audit trail** (letter opened / created /
+updated / PDF downloaded / settings changed / login events) viewable at
+`/audit/` with CSV export, enforces session timeout, password policy and login
+lockout, keeps patient data out of URLs, and can tie every action to a verified
+Windows account when run behind IIS. The plan is in
+`docs/hipaa-hardening-plan.md`; the server-side scripts (database roles, TLS,
+firewall, IIS, backups, service) are in `deploy/`.
 
 ## Running as a Windows service (optional)
 Install [NSSM](https://nssm.cc/) and run `nssm install MapIncLetters "<repo>\run.bat"`.
