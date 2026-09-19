@@ -1,8 +1,11 @@
 """
 Django settings for mapinc. All environment-specific values come from
-mapinc.ini next to manage.py (see mapinc.ini.example).
+mapinc.ini next to manage.py (see mapinc.ini.example). Set the MAPINC_INI
+environment variable to point at a different file (e.g. one with the
+migration role for `manage.py migrate`).
 """
 import configparser
+import os
 import sys
 from pathlib import Path
 
@@ -19,7 +22,7 @@ if sys.version_info < (3, 10):
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-_INI_PATH = BASE_DIR / "mapinc.ini"
+_INI_PATH = Path(os.environ.get("MAPINC_INI") or BASE_DIR / "mapinc.ini")
 if not _INI_PATH.exists():
     raise RuntimeError(
         f"Missing {_INI_PATH}. Copy mapinc.ini.example to mapinc.ini and edit it."
@@ -36,6 +39,20 @@ ALLOWED_HOSTS = [h.strip() for h in _app.get("allowed_hosts", "*").split(",") if
 
 PDF_CONVERTER = _app.get("pdf_converter", "word").strip().lower()
 WORD_TIMEOUT_SECONDS = _app.getint("word_timeout_seconds", fallback=60)
+
+# --- HIPAA hardening switches (see docs/hipaa-hardening-plan.md) -------------
+MAPINC_PRODUCTION = _app.getboolean("production", fallback=False)
+MAPINC_HTTPS = _app.getboolean("https", fallback=MAPINC_PRODUCTION)
+MAPINC_BEHIND_PROXY = _app.getboolean("behind_proxy", fallback=False)
+MAPINC_AUTH_MODE = _app.get("auth_mode", "open").strip().lower()          # open | login | remote_user
+MAPINC_SESSION_MINUTES = _app.getint("session_minutes", fallback=30)
+MAPINC_ALLOW_QUERY_PREFILL = _app.getboolean("allow_query_prefill", fallback=not MAPINC_PRODUCTION)
+MAPINC_HANDOFF_MINUTES = _app.getint("handoff_minutes", fallback=5)
+MAPINC_HANDOFF_ALLOWED_NETWORKS = [
+    n.strip() for n in _app.get("handoff_allowed_networks", "").split(",") if n.strip()
+]
+if MAPINC_AUTH_MODE not in {"open", "login", "remote_user"}:
+    raise RuntimeError(f"mapinc.ini: auth_mode must be open, login or remote_user (got {MAPINC_AUTH_MODE!r})")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -56,7 +73,18 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "letters.middleware.NoStoreMiddleware",
 ]
+if MAPINC_AUTH_MODE == "remote_user":
+    # IIS (Windows Authentication) forwards the logged-on user in X-Remote-User.
+    MIDDLEWARE.insert(
+        MIDDLEWARE.index("django.contrib.auth.middleware.AuthenticationMiddleware") + 1,
+        "letters.middleware.WindowsUserMiddleware",
+    )
+
+AUTHENTICATION_BACKENDS = ["django.contrib.auth.backends.ModelBackend"]
+if MAPINC_AUTH_MODE == "remote_user":
+    AUTHENTICATION_BACKENDS.insert(0, "letters.auth.WindowsUserBackend")
 
 ROOT_URLCONF = "mapinc.urls"
 
@@ -77,6 +105,10 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "mapinc.wsgi.application"
 
+_db_options = {"sslmode": _db.get("sslmode", "prefer").strip()}
+if _db.get("sslrootcert", "").strip():
+    _db_options["sslrootcert"] = _db.get("sslrootcert").strip()
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -85,6 +117,7 @@ DATABASES = {
         "PASSWORD": _db.get("password", ""),
         "HOST": _db.get("host", "localhost"),
         "PORT": _db.get("port", "5432"),
+        "OPTIONS": _db_options,
     }
 }
 
@@ -111,3 +144,22 @@ LOGOUT_REDIRECT_URL = "letter_form"
 # Serve /static/ from the app's static dirs without a collectstatic step (tiny LAN app).
 WHITENOISE_USE_FINDERS = True
 WHITENOISE_AUTOREFRESH = True
+
+# --- Session / transport hardening -------------------------------------------
+SESSION_COOKIE_AGE = MAPINC_SESSION_MINUTES * 60      # automatic logoff after inactivity
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_SAVE_EVERY_REQUEST = True                     # idle timer, not absolute
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_HTTPONLY = True
+X_FRAME_OPTIONS = "DENY"
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+if MAPINC_HTTPS:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 60 * 60 * 24 * 365
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+if MAPINC_BEHIND_PROXY:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    USE_X_FORWARDED_HOST = True
