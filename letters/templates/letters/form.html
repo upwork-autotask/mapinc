@@ -5,9 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Clinicals Request</title>
 <link rel="stylesheet" href="{% static 'letters/access.css' %}">
+<link rel="icon" href="{% static 'letters/map_logo.jpg' %}">
 </head>
 <body>
 <div class="access-form">
+  <div class="brand"><img src="{% static 'letters/map_logo.jpg' %}" alt="MAP - Medical Audit Professionals, Inc"></div>
   <div class="titlebar">Clinicals Request</div>
   <form method="post" class="detail" novalidate>
     {% csrf_token %}
