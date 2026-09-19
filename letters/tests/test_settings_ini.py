@@ -4,7 +4,8 @@ from django.conf import settings
 def test_database_comes_from_ini():
     db = settings.DATABASES["default"]
     assert db["ENGINE"] == "django.db.backends.postgresql"
-    assert db["NAME"] == settings.MAPINC_CONFIG["database"]["name"]
+    ini_name = settings.MAPINC_CONFIG["database"]["name"]
+    assert db["NAME"] in {ini_name, f"test_{ini_name}"}  # pytest-django swaps in the test DB name
     assert db["HOST"] == settings.MAPINC_CONFIG["database"]["host"]
 
 
