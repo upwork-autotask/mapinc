@@ -2,10 +2,11 @@ import datetime as dt
 import json
 
 import pytest
+from django.core.management import call_command
 from django.urls import reverse
 from django.utils import timezone
 
-from letters.models import Handoff
+from letters.models import Handoff, Letter
 
 DATA = {"case_encounter": "E-77", "policy_id": "WT-1", "member_name": "JOHN SMITH", "dob": "5/22/1953",
         "admission": "9/15/2026", "folder_name": "SMITH_JOHN", "user": "DOM\\rabdallah"}
@@ -60,7 +61,7 @@ def test_expired_or_unknown_token_shows_message(client, app_settings):
     assert r.context["form"].initial == {}
 
     token = Handoff.create(DATA)
-    Handoff.objects.filter(token=token).update(created_at=timezone.now() - Handoff.TTL - dt.timedelta(seconds=1))
+    Handoff.objects.filter(token=token).update(created_at=timezone.now() - Handoff.ttl() - dt.timedelta(seconds=1))
     r = client.get(reverse("letter_form"), {"t": token})
     assert "expired" in r.content.decode()
 
@@ -68,7 +69,56 @@ def test_expired_or_unknown_token_shows_message(client, app_settings):
 @pytest.mark.django_db
 def test_handoff_create_purges_expired_rows():
     old = Handoff.create(DATA)
-    Handoff.objects.filter(token=old).update(created_at=timezone.now() - Handoff.TTL - dt.timedelta(seconds=1))
+    Handoff.objects.filter(token=old).update(created_at=timezone.now() - Handoff.ttl() - dt.timedelta(seconds=1))
     Handoff.create(DATA)
     assert not Handoff.objects.filter(token=old).exists()
     assert Handoff.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_ttl_comes_from_settings(settings):
+    settings.MAPINC_HANDOFF_MINUTES = 7
+    assert Handoff.ttl() == dt.timedelta(minutes=7)
+
+
+@pytest.mark.django_db
+def test_token_is_single_use_after_the_letter_is_saved(client, app_settings, settings):
+    settings.PDF_CONVERTER = "fake"
+    url = client.post(reverse("letter_handoff"), DATA).content.decode().strip()
+    r = client.get(url)
+    token = r.context["form"].initial["token"]
+    assert token and Handoff.objects.filter(token=token).exists()
+    r = client.post(reverse("letter_form"), {**DATA, "dob": "1953-05-22", "token": token})
+    assert r.status_code == 200 and Letter.objects.filter(case_encounter="E-77").exists()
+    assert not Handoff.objects.filter(token=token).exists()
+    assert "expired" in client.get(url).content.decode()
+
+
+@pytest.mark.django_db
+def test_handoff_endpoint_restricted_to_allowed_networks(client, settings):
+    settings.MAPINC_HANDOFF_ALLOWED_NETWORKS = ["10.20.0.0/16", "127.0.0.1/32"]
+    assert client.post(reverse("letter_handoff"), DATA, REMOTE_ADDR="10.20.5.9").status_code == 200
+    assert client.post(reverse("letter_handoff"), DATA, REMOTE_ADDR="127.0.0.1").status_code == 200
+    assert client.post(reverse("letter_handoff"), DATA, REMOTE_ADDR="192.168.9.9").status_code == 403
+
+
+@pytest.mark.django_db
+def test_query_prefill_can_be_disabled(client, app_settings, settings):
+    settings.MAPINC_ALLOW_QUERY_PREFILL = False
+    r = client.get(reverse("letter_form"), DATA)
+    initial = r.context["form"].initial
+    assert initial.get("case_encounter") == "E-77" and initial.get("user") == "DOM\\rabdallah"
+    assert "member_name" not in initial and "dob" not in initial
+    # handoff tokens still work
+    url = client.post(reverse("letter_handoff"), DATA).content.decode().strip()
+    assert client.get(url).context["form"].initial["member_name"] == "JOHN SMITH"
+
+
+@pytest.mark.django_db
+def test_purge_handoffs_command():
+    fresh = Handoff.create(DATA)
+    stale = Handoff.create(DATA)
+    Handoff.objects.filter(token=stale).update(created_at=timezone.now() - Handoff.ttl() - dt.timedelta(seconds=1))
+    call_command("purge_handoffs")
+    assert Handoff.objects.filter(token=fresh).exists()
+    assert not Handoff.objects.filter(token=stale).exists()

@@ -1,13 +1,16 @@
 import csv
 import datetime as dt
+import ipaddress
 import json
 from pathlib import Path
 
+from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.http import FileResponse, Http404, HttpResponse, HttpResponseBadRequest, StreamingHttpResponse
+from django.http import (FileResponse, Http404, HttpResponse, HttpResponseBadRequest, HttpResponseForbidden,
+                         StreamingHttpResponse)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -46,7 +49,9 @@ def _initial_from_request(request) -> tuple[dict, bool]:
         stashed = Handoff.take(token)
         expired = stashed is None
         params.update(stashed or {})
-    params.update({name: request.GET[name] for name in QUERY_FIELDS if name in request.GET})
+    # In production only the case number and user may come from the URL; PHI arrives via handoff tokens.
+    allowed = QUERY_FIELDS if settings.MAPINC_ALLOW_QUERY_PREFILL else ("case_encounter", "user")
+    params.update({name: request.GET[name] for name in allowed if name in request.GET})
 
     initial: dict = {}
     case_encounter = (params.get("case_encounter") or "").strip()
@@ -58,6 +63,8 @@ def _initial_from_request(request) -> tuple[dict, bool]:
         value = (params.get(name) or "").strip()
         if value:
             initial[name] = _parse_dob(value) if name == "dob" else value
+    if token and not expired:
+        initial["token"] = token
     return initial, expired
 
 
@@ -80,6 +87,7 @@ def letter_form(request):
                              detail=str(exc), windows_user=windows_user)
                 form.add_error(None, str(exc))
             else:
+                Handoff.consume(data.get("token", ""))
                 audit.record(request, Action.LETTER_UPDATED if existed else Action.LETTER_CREATED,
                              case_encounter=letter.case_encounter, detail=Path(letter.pdf_path).name,
                              windows_user=windows_user)
@@ -159,6 +167,8 @@ def letter_handoff(request):
     with the URL to open (plain text), so the browser URL carries only a token.
     Accepts form-encoded or JSON bodies with the query-string field names.
     """
+    if not _handoff_allowed(request):
+        return HttpResponseForbidden("handoff not allowed from this address")
     if request.content_type == "application/json":
         try:
             payload = json.loads(request.body or b"{}")
@@ -232,3 +242,15 @@ def _audit_csv(events):
     response = StreamingHttpResponse(rows(), content_type="text/csv; charset=utf-8")
     response["Content-Disposition"] = f'attachment; filename="mapinc-audit-{stamp}.csv"'
     return response
+
+
+def _handoff_allowed(request) -> bool:
+    """[app] handoff_allowed_networks: empty = anyone; otherwise the caller must be inside one of the CIDRs."""
+    networks = settings.MAPINC_HANDOFF_ALLOWED_NETWORKS
+    if not networks:
+        return True
+    try:
+        ip = ipaddress.ip_address(audit.client_ip(request) or "")
+    except ValueError:
+        return False
+    return any(ip in ipaddress.ip_network(n, strict=False) for n in networks)

@@ -16,6 +16,7 @@ class LetterForm(forms.Form):
     admission = forms.CharField(label="Admission", max_length=200)
     folder_name = forms.CharField(label="Folder", max_length=300)
     user = forms.CharField(required=False, widget=forms.HiddenInput)
+    token = forms.CharField(required=False, widget=forms.HiddenInput)  # handoff token, consumed on save
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
