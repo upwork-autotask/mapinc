@@ -1,0 +1,204 @@
+Attribute VB_Name = "LetterLauncher"
+Option Explicit
+
+' ---------------------------------------------------------------------------
+' MAP Inc "Clinicals Request" launcher for Outlook VBA (no Access dependencies;
+' also works in Excel/Word VBA).
+'
+' Install:
+'   1. Outlook > Alt+F11 > File > Import File... > this .bas file
+'   2. Set LETTER_BASE_URL below to the server running run.bat
+'   3. File > Options > Trust Center > Trust Center Settings > Macro Settings:
+'      "Notifications for all macros" (or sign the project with SelfCert)
+'   4. Optional: File > Options > Customize Ribbon > Choose commands from:
+'      Macros > add OpenLetterFromPrompt to a custom group for a one-click button
+'
+' Call with your own values:
+'   OpenClinicalsLetterDialog "E-2001", "WT-123456", "JOHN SMITH", #5/22/1953#, "9/15/2026", "SMITH_JOHN"
+'
+' OpenClinicalsLetterDialog opens a dialog-sized, chromeless Edge window and
+' WAITS until it is closed. OpenClinicalsLetter returns immediately.
+' ---------------------------------------------------------------------------
+
+Private Const LETTER_BASE_URL As String = "http://SERVER-NAME:8000"   ' <-- server running run.bat
+
+' Dialog size in pixels (the web form is 480px wide)
+Private Const DIALOG_WIDTH As Long = 560
+Private Const DIALOG_HEIGHT As Long = 720
+
+#If VBA7 Then
+    Private Declare PtrSafe Function OpenProcess Lib "kernel32" (ByVal dwDesiredAccess As Long, ByVal bInheritHandle As Long, ByVal dwProcessId As Long) As LongPtr
+    Private Declare PtrSafe Function WaitForSingleObject Lib "kernel32" (ByVal hHandle As LongPtr, ByVal dwMilliseconds As Long) As Long
+    Private Declare PtrSafe Function CloseHandle Lib "kernel32" (ByVal hObject As LongPtr) As Long
+    Private Declare PtrSafe Function GetSystemMetrics Lib "user32" (ByVal nIndex As Long) As Long
+    Private Declare PtrSafe Function ShellExecuteW Lib "shell32" (ByVal hwnd As LongPtr, ByVal lpOperation As LongPtr, ByVal lpFile As LongPtr, ByVal lpParameters As LongPtr, ByVal lpDirectory As LongPtr, ByVal nShowCmd As Long) As LongPtr
+#Else
+    Private Declare Function OpenProcess Lib "kernel32" (ByVal dwDesiredAccess As Long, ByVal bInheritHandle As Long, ByVal dwProcessId As Long) As Long
+    Private Declare Function WaitForSingleObject Lib "kernel32" (ByVal hHandle As Long, ByVal dwMilliseconds As Long) As Long
+    Private Declare Function CloseHandle Lib "kernel32" (ByVal hObject As Long) As Long
+    Private Declare Function GetSystemMetrics Lib "user32" (ByVal nIndex As Long) As Long
+    Private Declare Function ShellExecuteW Lib "shell32" (ByVal hwnd As Long, ByVal lpOperation As Long, ByVal lpFile As Long, ByVal lpParameters As Long, ByVal lpDirectory As Long, ByVal nShowCmd As Long) As Long
+#End If
+
+Private Const SYNCHRONIZE As Long = &H100000
+Private Const WAIT_TIMEOUT As Long = &H102
+Private Const SM_CXSCREEN As Long = 0
+Private Const SM_CYSCREEN As Long = 1
+Private Const SW_SHOWNORMAL As Long = 1
+
+' ===========================================================================
+' Public entry points
+' ===========================================================================
+
+' Example macro for a ribbon button: asks for the values, then opens the dialog.
+Public Sub OpenLetterFromPrompt()
+    Dim caseEncounter As String, policyId As String, memberName As String
+    Dim dob As String, admission As String, folderName As String
+    caseEncounter = InputBox("Case / Encounter number:", "Clinicals Request")
+    If Len(caseEncounter) = 0 Then Exit Sub
+    policyId = InputBox("Policy ID No.:", "Clinicals Request")
+    memberName = InputBox("Member name:", "Clinicals Request")
+    dob = InputBox("Date of birth (m/d/yyyy):", "Clinicals Request")
+    admission = InputBox("Admission (date or status):", "Clinicals Request")
+    folderName = InputBox("Folder name (sub-folder under the PDF root):", "Clinicals Request", memberName)
+    OpenClinicalsLetterDialog caseEncounter, policyId, memberName, dob, admission, folderName
+End Sub
+
+' Opens the letter form in a dialog-sized Edge window and waits until it is closed.
+Public Sub OpenClinicalsLetterDialog(ByVal caseEncounter As Variant, ByVal policyId As Variant, _
+                                     ByVal memberName As Variant, ByVal dob As Variant, _
+                                     ByVal admission As Variant, ByVal folderName As Variant)
+    Dim pid As Double
+    pid = LaunchEdgeApp(BuildLetterUrl(caseEncounter, policyId, memberName, dob, admission, folderName))
+    If pid > 0 Then WaitForProcess pid
+End Sub
+
+' Opens the letter form in a dialog-sized Edge window and returns immediately.
+Public Sub OpenClinicalsLetter(ByVal caseEncounter As Variant, ByVal policyId As Variant, _
+                               ByVal memberName As Variant, ByVal dob As Variant, _
+                               ByVal admission As Variant, ByVal folderName As Variant)
+    LaunchEdgeApp BuildLetterUrl(caseEncounter, policyId, memberName, dob, admission, folderName)
+End Sub
+
+' Builds the pre-filled URL. Every value is optional; the form shows blanks for
+' whatever is not supplied. The Windows user name is added automatically.
+Public Function BuildLetterUrl(ByVal caseEncounter As Variant, ByVal policyId As Variant, _
+                               ByVal memberName As Variant, ByVal dob As Variant, _
+                               ByVal admission As Variant, ByVal folderName As Variant) As String
+    BuildLetterUrl = LETTER_BASE_URL & "/letter/?case_encounter=" & UrlEnc(NzS(caseEncounter)) & _
+                     "&policy_id=" & UrlEnc(NzS(policyId)) & _
+                     "&member_name=" & UrlEnc(NzS(memberName)) & _
+                     "&dob=" & UrlEnc(FormatDob(dob)) & _
+                     "&admission=" & UrlEnc(NzS(admission)) & _
+                     "&folder_name=" & UrlEnc(NzS(folderName)) & _
+                     "&user=" & UrlEnc(Environ("USERNAME"))
+End Function
+
+' ===========================================================================
+' Edge "app" window
+' ===========================================================================
+
+' Starts Edge in --app mode (no address bar or tabs) sized and centred like a
+' dialog. A private profile folder keeps the window in its own process, which
+' is what makes waiting for it possible. Returns the process id, or 0 if Edge
+' was not found (the page is then opened in the default browser instead).
+Private Function LaunchEdgeApp(ByVal url As String) As Double
+    Dim edge As String, profile As String, cmd As String, x As Long, y As Long
+    edge = FindEdge()
+    If Len(edge) = 0 Then
+        OpenInDefaultBrowser url
+        Exit Function
+    End If
+    profile = Environ("LOCALAPPDATA") & "\MapInc\LetterDialogProfile"
+    x = (GetSystemMetrics(SM_CXSCREEN) - DIALOG_WIDTH) \ 2
+    y = (GetSystemMetrics(SM_CYSCREEN) - DIALOG_HEIGHT) \ 2
+    If x < 0 Then x = 0
+    If y < 0 Then y = 0
+    cmd = """" & edge & """ --app=""" & url & """" & _
+          " --window-size=" & DIALOG_WIDTH & "," & DIALOG_HEIGHT & _
+          " --window-position=" & x & "," & y & _
+          " --user-data-dir=""" & profile & """ --no-first-run --no-default-browser-check"
+    LaunchEdgeApp = Shell(cmd, vbNormalFocus)
+End Function
+
+Private Function FindEdge() As String
+    Dim candidates As Variant, i As Integer
+    candidates = Array("C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe", _
+                       "C:\Program Files\Microsoft\Edge\Application\msedge.exe")
+    For i = LBound(candidates) To UBound(candidates)
+        If Len(Dir(candidates(i))) > 0 Then
+            FindEdge = candidates(i)
+            Exit Function
+        End If
+    Next i
+End Function
+
+Private Sub OpenInDefaultBrowser(ByVal url As String)
+    ShellExecuteW 0, StrPtr("open"), StrPtr(url), 0, 0, SW_SHOWNORMAL
+End Sub
+
+' Blocks (while keeping Outlook responsive) until the process exits.
+Private Sub WaitForProcess(ByVal pid As Double)
+    #If VBA7 Then
+        Dim h As LongPtr
+    #Else
+        Dim h As Long
+    #End If
+    h = OpenProcess(SYNCHRONIZE, 0, CLng(pid))
+    If h = 0 Then Exit Sub
+    Do While WaitForSingleObject(h, 100) = WAIT_TIMEOUT
+        DoEvents
+    Loop
+    CloseHandle h
+End Sub
+
+' ===========================================================================
+' Helpers
+' ===========================================================================
+
+' Null/Empty-safe string (replacement for Access's Nz).
+Private Function NzS(ByVal v As Variant) As String
+    If IsNull(v) Or IsEmpty(v) Or IsMissing(v) Then
+        NzS = ""
+    Else
+        NzS = Trim$(CStr(v))
+    End If
+End Function
+
+Private Function FormatDob(ByVal dob As Variant) As String
+    If IsDate(dob) Then
+        FormatDob = Format(CDate(dob), "yyyy-mm-dd")
+    Else
+        FormatDob = NzS(dob)
+    End If
+End Function
+
+' Percent-encodes a string as UTF-8 for use in a query string.
+Public Function UrlEnc(ByVal s As String) As String
+    Dim bytes() As Byte, i As Long, out As String
+    If Len(s) = 0 Then Exit Function
+    bytes = Utf8Bytes(s)
+    For i = LBound(bytes) To UBound(bytes)
+        Select Case bytes(i)
+            Case 48 To 57, 65 To 90, 97 To 122, 45, 46, 95, 126   ' 0-9 A-Z a-z - . _ ~
+                out = out & Chr(bytes(i))
+            Case Else
+                out = out & "%" & Right("0" & Hex(bytes(i)), 2)
+        End Select
+    Next i
+    UrlEnc = out
+End Function
+
+Private Function Utf8Bytes(ByVal s As String) As Byte()
+    Dim stm As Object
+    Set stm = CreateObject("ADODB.Stream")
+    stm.Type = 2            ' text
+    stm.Charset = "utf-8"
+    stm.Open
+    stm.WriteText s
+    stm.Position = 0
+    stm.Type = 1            ' binary
+    stm.Position = 3        ' skip the UTF-8 BOM
+    Utf8Bytes = stm.Read
+    stm.Close
+End Function
