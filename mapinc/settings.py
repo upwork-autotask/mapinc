@@ -7,6 +7,7 @@ migration role for `manage.py migrate`).
 import configparser
 import os
 import sys
+from datetime import timedelta
 from pathlib import Path
 
 if sys.version_info < (3, 10):
@@ -61,6 +62,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "axes",
     "letters",
 ]
 
@@ -74,6 +76,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "letters.middleware.NoStoreMiddleware",
+    "axes.middleware.AxesMiddleware",
 ]
 if MAPINC_AUTH_MODE == "remote_user":
     # IIS (Windows Authentication) forwards the logged-on user in X-Remote-User.
@@ -82,9 +85,10 @@ if MAPINC_AUTH_MODE == "remote_user":
         "letters.middleware.WindowsUserMiddleware",
     )
 
-AUTHENTICATION_BACKENDS = ["django.contrib.auth.backends.ModelBackend"]
+# AxesStandaloneBackend must come first: it blocks locked-out accounts before any real backend runs.
+AUTHENTICATION_BACKENDS = ["axes.backends.AxesStandaloneBackend", "django.contrib.auth.backends.ModelBackend"]
 if MAPINC_AUTH_MODE == "remote_user":
-    AUTHENTICATION_BACKENDS.insert(0, "letters.auth.WindowsUserBackend")
+    AUTHENTICATION_BACKENDS.insert(1, "letters.auth.WindowsUserBackend")
 
 ROOT_URLCONF = "mapinc.urls"
 
@@ -123,8 +127,19 @@ DATABASES = {
 }
 
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 12}},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
+
+# --- Login lockout (django-axes) ---------------------------------------------
+AXES_FAILURE_LIMIT = _app.getint("lockout_failures", fallback=5)
+AXES_COOLOFF_TIME = timedelta(minutes=_app.getint("lockout_minutes", fallback=15))
+AXES_LOCKOUT_PARAMETERS = ["username"]                # lock the account, whatever the source address
+AXES_RESET_ON_SUCCESS = True
+AXES_LOCKOUT_TEMPLATE = "letters/locked_out.html"
+AXES_ENABLE_ACCESS_FAILURE_LOG = True
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "America/New_York"

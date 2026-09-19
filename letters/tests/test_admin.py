@@ -21,8 +21,7 @@ SETTINGS_POST = {
 
 @pytest.fixture
 def admin_client(client, db):
-    User.objects.create_superuser("admin", "admin@example.com", "pw")
-    client.login(username="admin", password="pw")
+    client.force_login(User.objects.create_superuser("admin", "admin@example.com", "pw"))
     return client
 
 

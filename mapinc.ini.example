@@ -29,6 +29,9 @@ behind_proxy = false
 auth_mode = open
 ; automatic logoff after this many idle minutes
 session_minutes = 30
+; lock an account after this many failed sign-ins, for this many minutes
+lockout_failures = 5
+lockout_minutes = 15
 ; allow ?member_name=... style prefill in the URL (dev/testing only; launchers use handoff tokens)
 allow_query_prefill = true
 ; who may call /letter/handoff/ (comma-separated CIDRs; empty = anyone)

@@ -1,0 +1,15 @@
+{% extends "letters/base.html" %}
+
+{% block title %}Account locked{% endblock %}
+{% block heading %}Account locked{% endblock %}
+{% block status %}Too many failed sign-in attempts{% endblock %}
+{% block login_button %}{% endblock %}
+
+{% block content %}
+  <div class="detail">
+    <div class="msgbar">This account is locked after too many failed sign-in attempts. Try again in {{ cooloff_timedelta|default:"15 minutes" }}, or ask an administrator to unlock it.</div>
+    <div class="buttons">
+      <a class="button default" href="{% url 'letter_form' %}">Back to the letter form</a>
+    </div>
+  </div>
+{% endblock %}
