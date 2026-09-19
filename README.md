@@ -65,8 +65,10 @@ python manage.py runserver
 
 ## Using it from Access
 Import `access/LetterLauncher.bas`, set `LETTER_BASE_URL`, and call
-`OpenClinicalsLetter caseEncounter, policyId, memberName, dob, admission, folderName`
-from a button. Access passes the sub-folder name; the PDF is written to
+`OpenClinicalsLetterDialog caseEncounter, policyId, memberName, dob, admission, folderName`
+from a button (opens a dialog-sized Edge window and waits until it is closed;
+`OpenClinicalsLetter` is the non-blocking variant, and the module documents a
+true Access modal form using the Edge Browser Control for Microsoft 365 Access). Access passes the sub-folder name; the PDF is written to
 `<PDF root folder>\<folder name>\CLINICALS REQUEST-<member>-SENT<mmddyy>.pdf`
 (the filled `.docx` is kept next to it). The Windows user name is recorded as
 created/modified by. Opening the form again for the same case/encounter loads the
