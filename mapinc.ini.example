@@ -1,0 +1,13 @@
+[database]
+host = localhost
+port = 5432
+name = mapinc
+user = mapinc
+password = mapinc
+
+[app]
+secret_key = change-me-to-a-long-random-string
+allowed_hosts = *
+debug = true
+pdf_converter = word
+word_timeout_seconds = 60
