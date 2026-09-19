@@ -1,0 +1,26 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clinicals Request</title>
+<link rel="stylesheet" href="{% static 'letters/access.css' %}">
+</head>
+<body>
+<div class="access-form">
+  <div class="titlebar">Clinicals Request</div>
+  <div class="detail success">
+    <p><strong>PDF saved.</strong></p>
+    <div class="path">{{ letter.pdf_path }}</div>
+    <p>{{ letter.member_name }} &middot; Policy {{ letter.policy_id }} &middot; Case {{ letter.case_encounter }}</p>
+    <p class="muted">Saved by {{ letter.modified_by }} on {{ letter.modified_at|date:"n/j/Y g:i A" }}. You can close this window.</p>
+    <div class="buttons">
+      <a class="button default" href="{% url 'letter_pdf' letter.case_encounter %}" target="_blank" rel="noopener">Open PDF</a>
+      <a class="button" href="{% url 'letter_form' %}?case_encounter={{ letter.case_encounter|urlencode }}&amp;user={{ letter.modified_by|urlencode }}">Edit again</a>
+      <button type="button" onclick="window.close()">Close</button>
+    </div>
+  </div>
+  <div class="statusbar">Form View</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,24 @@
+:root { font-family: "Segoe UI", Tahoma, sans-serif; font-size: 12px; }
+html, body { margin: 0; background: #dcdcdc; color: #000; }
+body { display: flex; justify-content: center; padding: 24px 16px; }
+.access-form { width: 480px; max-width: 100%; background: #f0f0f0; border: 1px solid #6d6d6d; box-shadow: 2px 2px 6px rgba(0,0,0,.35); }
+.titlebar { background: linear-gradient(#fdfdfd, #e5e5e5); border-bottom: 1px solid #a0a0a0; padding: 6px 10px; font-weight: 600; }
+.detail { padding: 14px 16px 10px; }
+.row { display: grid; grid-template-columns: 120px 1fr; align-items: center; gap: 4px 8px; margin-bottom: 8px; }
+.row label { text-align: right; }
+.row input[type=text], .row input[type=date] { width: 100%; box-sizing: border-box; border: 1px solid #7a7a7a; border-top-color: #404040; border-left-color: #404040; background: #fff; padding: 3px 4px; font: inherit; }
+.row input:focus { outline: 2px solid #ffd54f; outline-offset: -1px; }
+.folder { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.folder .root { color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
+.error { grid-column: 2; color: #c00; font-size: 11px; }
+.has-error input { border-color: #c00; }
+.msgbar { background: #fff4ce; border: 1px solid #d9b300; padding: 6px 8px; margin-bottom: 10px; }
+.footer-note { color: #555; font-size: 11px; border-top: 1px dotted #aaa; padding-top: 6px; margin-top: 4px; }
+.buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+button, a.button { font: inherit; padding: 4px 14px; min-width: 90px; background: #e1e1e1; border: 1px solid #adadad; color: #000; text-decoration: none; text-align: center; cursor: pointer; }
+button.default, a.button.default { border-color: #0078d7; box-shadow: inset 0 0 0 1px #0078d7; }
+button:hover, a.button:hover { background: #e5f1fb; border-color: #0078d7; }
+.statusbar { border-top: 1px solid #a0a0a0; background: #e8e8e8; padding: 3px 8px; font-size: 11px; color: #333; }
+.success p { margin: 6px 0; }
+.success .path { font-family: Consolas, monospace; font-size: 11px; word-break: break-all; background: #fff; border: 1px solid #7a7a7a; padding: 4px; }
+.muted { color: #555; }

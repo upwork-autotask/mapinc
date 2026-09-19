@@ -1,0 +1,46 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clinicals Request</title>
+<link rel="stylesheet" href="{% static 'letters/access.css' %}">
+</head>
+<body>
+<div class="access-form">
+  <div class="titlebar">Clinicals Request</div>
+  <form method="post" class="detail" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="msgbar">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+    {% for field in form.visible_fields %}
+      <div class="row{% if field.errors %} has-error{% endif %}">
+        <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
+        {% if field.name == "folder_name" %}
+          <div class="folder">
+            <span class="root" title="Root folder from admin settings">{{ app_settings.pdf_root_folder|default:"(root folder not set)" }}\</span>{{ field }}
+          </div>
+        {% else %}
+          {{ field }}
+        {% endif %}
+        {% if field.errors %}<div class="error">{{ field.errors|join:" " }}</div>{% endif %}
+      </div>
+    {% endfor %}
+    {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+    <div class="footer-note">ATTN: {{ app_settings.attn_default }} &middot; Client: {{ app_settings.client_default }} &middot; Dr. {{ app_settings.doctor_default }}</div>
+    <div class="buttons">
+      <button type="submit" class="default">Save &amp; Create PDF</button>
+      <button type="button" onclick="window.close()">Cancel</button>
+    </div>
+  </form>
+  <div class="statusbar">Form View</div>
+</div>
+<script>
+  // Enter in any text box submits (Access behaviour); the first empty box gets focus.
+  document.querySelectorAll('.detail input[type=text]').forEach(function (el) {
+    el.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); el.form.requestSubmit(); } });
+  });
+  var first = Array.prototype.find.call(document.querySelectorAll('.detail input:not([type=hidden])'), function (el) { return !el.value; });
+  (first || document.querySelector('.detail input:not([type=hidden])')).focus();
+</script>
+</body>
+</html>
