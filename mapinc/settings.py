@@ -8,16 +8,12 @@ from pathlib import Path
 
 if sys.version_info < (3, 10):
     raise SystemExit(
-        f"mapinc requires Python 3.10 or newer (3.13 recommended); this is Python {sys.version.split()[0]}.
-"
-        "Recreate the virtualenv with a newer interpreter:
-"
-        "    py -0                      (lists installed versions)
-"
-        "    py -3.13 -m venv .venv
-"
-        "    .\.venv\Scripts\Activate.ps1
-"
+        "mapinc requires Python 3.10 or newer (3.13 recommended); this is Python "
+        + sys.version.split()[0] + ".\n"
+        "Recreate the virtualenv with a newer interpreter:\n"
+        "    py -0                      (lists installed versions)\n"
+        "    py -3.13 -m venv .venv\n"
+        "    .\\.venv\\Scripts\\Activate.ps1\n"
         "    pip install -r requirements.txt"
     )
 
