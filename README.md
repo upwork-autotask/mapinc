@@ -57,6 +57,7 @@ python manage.py runserver
 ```
 
 **Troubleshooting**
+- *"mapinc requires Python 3.10 or newer"* or `TypeError: unsupported operand type(s) for |` — the virtualenv was created with an old Python (e.g. 3.9). Install Python 3.13, then `Remove-Item -Recurse .venv`, `py -3.13 -m venv .venv`, activate it and `pip install -r requirements.txt` again.
 - *"Database migration failed"* — PostgreSQL is not running or `mapinc.ini` has the wrong host/user/password.
 - *"Missing mapinc.ini"* — copy `mapinc.ini.example` to `mapinc.ini` (see First-time setup).
 - *Port already in use* — another copy is running; find it with `netstat -ano | findstr :8000` and stop it, or change the port in `run.bat`.

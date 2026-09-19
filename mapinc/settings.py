@@ -3,7 +3,23 @@ Django settings for mapinc. All environment-specific values come from
 mapinc.ini next to manage.py (see mapinc.ini.example).
 """
 import configparser
+import sys
 from pathlib import Path
+
+if sys.version_info < (3, 10):
+    raise SystemExit(
+        f"mapinc requires Python 3.10 or newer (3.13 recommended); this is Python {sys.version.split()[0]}.
+"
+        "Recreate the virtualenv with a newer interpreter:
+"
+        "    py -0                      (lists installed versions)
+"
+        "    py -3.13 -m venv .venv
+"
+        "    .\.venv\Scripts\Activate.ps1
+"
+        "    pip install -r requirements.txt"
+    )
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
