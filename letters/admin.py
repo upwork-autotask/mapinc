@@ -18,7 +18,7 @@ class AppSettingsAdmin(admin.ModelAdmin):
     form = AppSettingsForm
     fieldsets = (
         ("Letter defaults", {"fields": ("attn_default", "client_default", "doctor_default")}),
-        ("PDF output", {"fields": ("pdf_root_folder", "pdf_filename_pattern")}),
+        ("PDF output", {"fields": ("pdf_filename_pattern",)}),
         ("Word template", {"fields": ("template",)}),
     )
 

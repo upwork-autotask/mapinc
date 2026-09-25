@@ -38,6 +38,8 @@ MAPINC_SESSION_MINUTES = env.get_int("MAPINC_SESSION_MINUTES", 30)
 MAPINC_ALLOW_QUERY_PREFILL = env.get_bool("MAPINC_ALLOW_QUERY_PREFILL", not MAPINC_PRODUCTION)
 MAPINC_HANDOFF_MINUTES = env.get_int("MAPINC_HANDOFF_MINUTES", 5)
 MAPINC_HANDOFF_ALLOWED_NETWORKS = env.get_list("MAPINC_HANDOFF_ALLOWED_NETWORKS")
+# Empty = any full path the launcher supplies; set it to limit where letters may be written.
+MAPINC_ALLOWED_FOLDER_ROOTS = env.get_list("MAPINC_ALLOWED_FOLDER_ROOTS")
 if MAPINC_AUTH_MODE not in {"open", "login", "remote_user"}:
     raise RuntimeError(f"MAPINC_AUTH_MODE must be open, login or remote_user (got {MAPINC_AUTH_MODE!r})")
 

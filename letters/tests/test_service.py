@@ -8,8 +8,8 @@ from letters.docgen.service import LetterGenerationError, generate_letter
 from letters.models import Letter
 from letters.tests.test_template_fill import _sdt_texts
 
-DATA = dict(case_encounter="E-100", policy_id="WT-123456", member_name="JOHN SMITH",
-            dob=dt.date(1953, 5, 22), admission="9/15/2026", folder_name="SMITH_JOHN")
+BASE = dict(case_encounter="E-100", policy_id="WT-123456", member_name="JOHN SMITH",
+            dob=dt.date(1953, 5, 22), admission="9/15/2026")
 
 
 @pytest.fixture(autouse=True)
@@ -17,22 +17,28 @@ def fake_converter(settings):
     settings.PDF_CONVERTER = "fake"
 
 
+@pytest.fixture
+def DATA(claims_folder):
+    """Letter values with the full destination folder, as the launcher supplies it."""
+    return {**BASE, "folder_name": str(claims_folder)}
+
+
 @pytest.mark.django_db
-def test_creates_letter_files_and_audit_fields(app_settings):
-    letter = generate_letter(DATA, "DOMAIN\rabdallah")
+def test_creates_letter_files_and_audit_fields(app_settings, DATA, claims_folder):
+    letter = generate_letter(DATA, "DOMAIN\\rabdallah")
     pdf = Path(letter.pdf_path)
-    assert pdf.parent == Path(app_settings.pdf_root_folder) / "SMITH_JOHN"
+    assert pdf.parent == claims_folder
     assert pdf.name.startswith("CLINICALS REQUEST-JOHN SMITH-SENT") and pdf.suffix == ".pdf"
     assert pdf.read_bytes().startswith(b"%PDF")
     assert Path(letter.docx_path) == pdf.with_suffix(".docx") and Path(letter.docx_path).exists()
     assert (letter.attn, letter.client, letter.doctor) == ("UR DEPARTMENT", "WORLDTRIPS", "RICHARD ABDALLAH")
-    assert letter.created_by == letter.modified_by == "DOMAIN\rabdallah"
+    assert letter.created_by == letter.modified_by == "DOMAIN\\rabdallah"
     assert letter.created_at is not None and letter.modified_at is not None
     assert Letter.objects.count() == 1
 
 
 @pytest.mark.django_db
-def test_docx_contains_the_values_and_snapshotted_defaults(app_settings):
+def test_docx_contains_the_values_and_snapshotted_defaults(app_settings, DATA):
     letter = generate_letter(DATA, "u")
     texts = _sdt_texts(Path(letter.docx_path).read_bytes())
     assert texts["keywords"] == ["WT-123456"]
@@ -41,7 +47,7 @@ def test_docx_contains_the_values_and_snapshotted_defaults(app_settings):
 
 
 @pytest.mark.django_db
-def test_update_keeps_created_by_and_replaces_old_files(app_settings):
+def test_update_keeps_created_by_and_replaces_old_files(app_settings, DATA):
     first = generate_letter(DATA, "alice")
     old_pdf, old_docx = Path(first.pdf_path), Path(first.docx_path)
     second = generate_letter({**DATA, "member_name": "JANE SMITH"}, "bob")
@@ -55,27 +61,27 @@ def test_update_keeps_created_by_and_replaces_old_files(app_settings):
 
 
 @pytest.mark.django_db
-def test_blank_user_becomes_unknown(app_settings):
+def test_blank_user_becomes_unknown(app_settings, DATA):
     assert generate_letter(DATA, "  ").created_by == "unknown"
 
 
 @pytest.mark.django_db
-def test_invalid_folder_name_saves_nothing(app_settings):
+def test_invalid_folder_name_saves_nothing(app_settings, DATA):
     with pytest.raises(LetterGenerationError):
-        generate_letter({**DATA, "folder_name": r"..\x"}, "u")
+        generate_letter({**DATA, "folder_name": r"SMITH_JOHN"}, "u")  # not a full path
     assert Letter.objects.count() == 0
 
 
 @pytest.mark.django_db
-def test_missing_root_folder_is_reported(app_settings):
-    app_settings.pdf_root_folder = ""
-    app_settings.save()
-    with pytest.raises(LetterGenerationError, match="root folder"):
+def test_folder_outside_the_allowed_roots_is_reported(app_settings, DATA, settings, tmp_path):
+    settings.MAPINC_ALLOWED_FOLDER_ROOTS = [str(tmp_path / "elsewhere")]
+    with pytest.raises(LetterGenerationError, match="not an allowed"):
         generate_letter(DATA, "u")
+    assert Letter.objects.count() == 0
 
 
 @pytest.mark.django_db
-def test_converter_failure_saves_nothing(app_settings, monkeypatch):
+def test_converter_failure_saves_nothing(app_settings, DATA, monkeypatch):
     def boom(*args, **kwargs):
         raise ConversionError("Word exploded")
 
@@ -86,6 +92,6 @@ def test_converter_failure_saves_nothing(app_settings, monkeypatch):
 
 
 @pytest.mark.django_db
-def test_missing_required_field(app_settings):
+def test_missing_required_field(app_settings, DATA):
     with pytest.raises(LetterGenerationError, match="member_name"):
         generate_letter({**DATA, "member_name": ""}, "u")

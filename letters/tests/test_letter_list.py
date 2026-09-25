@@ -15,7 +15,7 @@ def staff(db):
 def _letter(i, **overrides):
     fields = dict(case_encounter=f"E-{i:03d}", policy_id=f"P-{i}", member_name=f"MEMBER {i}",
                   dob=dt.date(1970, 1, 1), admission="9/1/2026", attn="a", client="c", doctor="d",
-                  folder_name="F", pdf_path=rf"C:\claims\F\letter{i}.pdf", docx_path="",
+                  folder_name=rf"D:\claims\M{i}", pdf_path=rf"D:\claims\M{i}\letter{i}.pdf", docx_path="",
                   created_by="alice", modified_by="bob")
     return Letter.objects.create(**{**fields, **overrides})
 

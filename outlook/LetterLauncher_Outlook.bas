@@ -14,7 +14,11 @@ Option Explicit
 '      Macros > add OpenLetterFromPrompt to a custom group for a one-click button
 '
 ' Call with your own values:
-'   OpenClinicalsLetterDialog "E-2001", "WT-123456", "JOHN SMITH", #5/22/1953#, "9/15/2026", "SMITH_JOHN"
+'   OpenClinicalsLetterDialog "E-2001", "WT-123456", "JOHN SMITH", #5/22/1953#, "9/15/2026", _
+'                             "\\server\claims\SMITH_JOHN"
+'
+' The last argument is the WHOLE destination folder; the letter (.pdf and .docx)
+' is written into it, and the web form shows it read-only.
 '
 ' How it works: the values are POSTed to the server, which answers with a
 ' short-lived link (…/letter/?t=<token>) — so no patient data ever appears in
@@ -63,7 +67,7 @@ Public Sub OpenLetterFromPrompt()
     memberName = InputBox("Member name:", "Clinicals Request")
     dob = InputBox("Date of birth (m/d/yyyy):", "Clinicals Request")
     admission = InputBox("Admission (date or status):", "Clinicals Request")
-    folderName = InputBox("Folder name (sub-folder under the PDF root):", "Clinicals Request", memberName)
+    folderName = InputBox("Destination folder (full path):", "Clinicals Request")
     OpenClinicalsLetterDialog caseEncounter, policyId, memberName, dob, admission, folderName
 End Sub
 

@@ -5,8 +5,13 @@ from django.urls import reverse
 
 from letters.models import Letter
 
-VALID = {"case_encounter": "E1", "policy_id": "P1", "member_name": "JOHN SMITH", "dob": "1953-05-22",
-         "admission": "9/15/2026", "folder_name": "SMITH", "user": "DOM\\launcher"}
+BASE = {"case_encounter": "E1", "policy_id": "P1", "member_name": "JOHN SMITH", "dob": "1953-05-22",
+        "admission": "9/15/2026", "user": "DOM\\launcher"}
+
+
+@pytest.fixture
+def VALID(claims_folder):
+    return {**BASE, "folder_name": str(claims_folder)}
 
 
 @pytest.fixture(autouse=True)
@@ -32,13 +37,13 @@ def remote_user_mode(settings):
 # --- open (default) ----------------------------------------------------------
 
 @pytest.mark.django_db
-def test_open_mode_records_launcher_user(client, app_settings):
+def test_open_mode_records_launcher_user(client, app_settings, VALID):
     client.post(reverse("letter_form"), VALID)
     assert Letter.objects.get().created_by == "DOM\\launcher"
 
 
 @pytest.mark.django_db
-def test_open_mode_prefers_the_logged_in_user_when_there_is_one(client, app_settings):
+def test_open_mode_prefers_the_logged_in_user_when_there_is_one(client, app_settings, VALID):
     client.force_login(User.objects.create_user("alice", password="pw"))
     client.post(reverse("letter_form"), VALID)
     assert Letter.objects.get().created_by == "alice"
@@ -47,7 +52,7 @@ def test_open_mode_prefers_the_logged_in_user_when_there_is_one(client, app_sett
 # --- login -------------------------------------------------------------------
 
 @pytest.mark.django_db
-def test_login_mode_requires_login_for_form_and_pdf(client, app_settings, login_mode):
+def test_login_mode_requires_login_for_form_and_pdf(client, app_settings, login_mode, VALID):
     r = client.get(reverse("letter_form"), {"case_encounter": "E1"})
     assert r.status_code == 302 and r.url.startswith(reverse("login"))
     r = client.post(reverse("letter_form"), VALID)
@@ -57,7 +62,7 @@ def test_login_mode_requires_login_for_form_and_pdf(client, app_settings, login_
 
 
 @pytest.mark.django_db
-def test_login_mode_uses_the_verified_user(client, app_settings, login_mode):
+def test_login_mode_uses_the_verified_user(client, app_settings, login_mode, VALID):
     client.force_login(User.objects.create_user("bob", password="pw"))
     r = client.post(reverse("letter_form"), VALID)
     assert r.status_code == 200
@@ -67,7 +72,7 @@ def test_login_mode_uses_the_verified_user(client, app_settings, login_mode):
 # --- remote_user (IIS Windows Authentication) --------------------------------
 
 @pytest.mark.django_db
-def test_remote_user_header_authenticates_and_creates_a_non_staff_user(app_settings, remote_user_mode):
+def test_remote_user_header_authenticates_and_creates_a_non_staff_user(app_settings, remote_user_mode, VALID):
     c = Client(HTTP_X_REMOTE_USER="MAP\\jdoe")
     r = c.get(reverse("letter_form"))
     assert r.status_code == 200

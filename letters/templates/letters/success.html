@@ -4,6 +4,10 @@
   <div class="detail success">
     <p><strong>PDF saved.</strong></p>
     <div class="path">{{ letter.pdf_path }}</div>
+    <div class="buttons folder-line">
+      <button type="button" class="small open-folder" data-path="{{ letter.folder_name }}"
+              title="Copy the folder path and try to open it in File Explorer">Open folder</button>
+    </div>
     <p>{{ letter.member_name }} &middot; Policy {{ letter.policy_id }} &middot; Case {{ letter.case_encounter }}</p>
     <p class="muted">Saved by {{ letter.modified_by }} on {{ letter.modified_at|date:"n/j/Y g:i A" }}. You can close this window.</p>
     <div class="buttons">

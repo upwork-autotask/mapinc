@@ -3,12 +3,18 @@ import datetime as dt
 import pytest
 from django.contrib.auth.models import User
 from django.urls import reverse
+from django.utils import timezone
 
 from letters.models import AppSettings, AuditEvent, Letter
 
 A = AuditEvent.Action
-VALID = {"case_encounter": "E1", "policy_id": "P1", "member_name": "JOHN SMITH", "dob": "1953-05-22",
-         "admission": "9/15/2026", "folder_name": "SMITH", "user": "DOM\\bob"}
+BASE = {"case_encounter": "E1", "policy_id": "P1", "member_name": "JOHN SMITH", "dob": "1953-05-22",
+        "admission": "9/15/2026", "user": "DOM\\bob"}
+
+
+@pytest.fixture
+def VALID(claims_folder):
+    return {**BASE, "folder_name": str(claims_folder)}
 
 
 @pytest.fixture(autouse=True)
@@ -36,7 +42,7 @@ def test_opening_the_form_for_a_case_is_audited(client, app_settings):
 
 
 @pytest.mark.django_db
-def test_create_update_and_download_are_audited(client, app_settings):
+def test_create_update_and_download_are_audited(client, app_settings, VALID):
     client.post(reverse("letter_form"), VALID)
     client.post(reverse("letter_form"), {**VALID, "admission": "9/16/2026", "user": "DOM\\jane"})
     client.get(reverse("letter_pdf", args=["E1"]))
@@ -46,12 +52,10 @@ def test_create_update_and_download_are_audited(client, app_settings):
 
 
 @pytest.mark.django_db
-def test_failed_generation_is_audited(client, app_settings):
-    app_settings.pdf_root_folder = ""
-    app_settings.save()
-    client.post(reverse("letter_form"), VALID)
+def test_failed_generation_is_audited(client, app_settings, VALID):
+    client.post(reverse("letter_form"), {**VALID, "folder_name": "SMITH"})  # not a full path
     (ev,) = _events(A.LETTER_FAILED)
-    assert "root folder" in ev.detail and ev.case_encounter == "E1"
+    assert "full path" in ev.detail and ev.case_encounter == "E1"
 
 
 @pytest.mark.django_db
@@ -59,7 +63,7 @@ def test_list_and_settings_are_audited(client, staff, app_settings):
     client.force_login(staff)
     client.get(reverse("letter_list"), {"q": "smith"})
     client.post(reverse("settings"), {"attn_default": "UR DEPT", "client_default": "WORLDTRIPS",
-                                      "doctor_default": "RICHARD ABDALLAH", "pdf_root_folder": app_settings.pdf_root_folder,
+                                      "doctor_default": "RICHARD ABDALLAH",
                                       "pdf_filename_pattern": AppSettings.DEFAULT_FILENAME_PATTERN})
     listed, changed = _events(A.LIST_VIEWED)[0], _events(A.SETTINGS_CHANGED)[0]
     assert listed.user == "report" and "smith" in listed.detail
@@ -77,9 +81,9 @@ def test_login_logout_and_failures_are_audited(client, staff):
 
 
 @pytest.mark.django_db
-def test_regenerate_action_is_audited(client, staff, app_settings):
+def test_regenerate_action_is_audited(client, staff, app_settings, claims_folder):
     Letter.objects.create(case_encounter="E9", policy_id="P", member_name="M", dob=dt.date(1970, 1, 1),
-                          admission="x", attn="a", client="c", doctor="d", folder_name="F",
+                          admission="x", attn="a", client="c", doctor="d", folder_name=str(claims_folder),
                           pdf_path="", docx_path="", created_by="u", modified_by="u")
     client.force_login(staff)
     client.post(reverse("admin:letters_letter_changelist"),
@@ -100,7 +104,7 @@ def test_audit_page_access(client, staff):
 
 
 @pytest.mark.django_db
-def test_audit_page_filters_and_csv(client, staff, app_settings):
+def test_audit_page_filters_and_csv(client, staff, app_settings, VALID):
     client.post(reverse("letter_form"), VALID)
     client.post(reverse("letter_form"), {**VALID, "case_encounter": "E2"})
     client.force_login(staff)
@@ -109,7 +113,7 @@ def test_audit_page_filters_and_csv(client, staff, app_settings):
     assert {e.case_encounter for e in rows} == {"E2"}
     r = client.get(reverse("audit_log"), {"action": A.LETTER_CREATED})
     assert all(e.action == A.LETTER_CREATED for e in r.context["page"].object_list)
-    today = dt.date.today().isoformat()
+    today = timezone.localdate().isoformat()  # the app's timezone, not the machine's
     assert client.get(reverse("audit_log"), {"from": today, "to": today}).context["page"].paginator.count >= 2
     assert client.get(reverse("audit_log"), {"from": "2000-01-01", "to": "2000-01-02"}).context["page"].paginator.count == 0
 

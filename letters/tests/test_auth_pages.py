@@ -8,7 +8,7 @@ from letters.tests.test_admin import _template_without
 
 SETTINGS_POST = {
     "attn_default": "UR DEPT", "client_default": "WORLDTRIPS", "doctor_default": "RICHARD ABDALLAH",
-    "pdf_root_folder": r"\\server\claims", "pdf_filename_pattern": AppSettings.DEFAULT_FILENAME_PATTERN,
+    "pdf_filename_pattern": AppSettings.DEFAULT_FILENAME_PATTERN,
 }
 
 
@@ -56,11 +56,11 @@ def test_settings_page_shows_and_saves(client, staff, app_settings):
     r = client.get(reverse("settings"))
     html = r.content.decode()
     assert r.status_code == 200
-    assert "map_logo.jpg" in html and app_settings.pdf_root_folder in html
+    assert "map_logo.jpg" in html and AppSettings.DEFAULT_FILENAME_PATTERN in html
     r = client.post(reverse("settings"), SETTINGS_POST)
     assert r.status_code == 302 and r.url == reverse("settings")
     s = AppSettings.load()
-    assert s.attn_default == "UR DEPT" and s.pdf_root_folder == r"\\server\claims"
+    assert s.attn_default == "UR DEPT"
     assert s.template  # kept when no new file is uploaded
     assert "Settings saved" in client.get(reverse("settings")).content.decode()
 

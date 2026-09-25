@@ -15,7 +15,12 @@ def app_settings(db, tmp_path, template_bytes, settings):
 
     settings.MEDIA_ROOT = tmp_path / "media"
     s = AppSettings.load()
-    s.pdf_root_folder = str(tmp_path / "claims")
     s.template.save("clinicals_request_template.docx", ContentFile(template_bytes), save=False)
     s.save()
     return s
+
+
+@pytest.fixture
+def claims_folder(tmp_path):
+    """The full destination folder the launcher would pass in folder_name."""
+    return tmp_path / "claims" / "SMITH_JOHN"

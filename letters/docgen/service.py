@@ -33,7 +33,7 @@ def generate_letter(data: dict, windows_user: str) -> Letter:
         attn=s.attn_default, client=s.client_default, doctor=s.doctor_default,
     )
     try:
-        folder = resolve_folder(s.pdf_root_folder, data["folder_name"])
+        folder = resolve_folder(data["folder_name"])
         template = s.template_bytes()
     except (InvalidFolderName, ValueError) as exc:
         raise LetterGenerationError(str(exc)) from exc

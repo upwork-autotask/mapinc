@@ -35,6 +35,60 @@
   {% block content %}{% endblock %}
   <div class="statusbar">{% block status %}Form View{% endblock %}</div>
 </div>
+<script>
+  // "Open folder": browsers block file:// links from a web page, so copy the path
+  // to the clipboard as well and tell the user what happened.
+  function mapincFileUrl(path) {
+    var s = path.replace(/\\/g, "/");
+    return s.indexOf("//") === 0 ? "file:" + s : "file:///" + s;
+  }
+  function mapincCopy(text) {
+    if (navigator.clipboard && window.isSecureContext) { return navigator.clipboard.writeText(text); }
+    return new Promise(function (resolve, reject) {
+      var box = document.createElement("textarea");
+      box.value = text; box.setAttribute("readonly", ""); box.style.position = "fixed"; box.style.opacity = "0";
+      document.body.appendChild(box); box.select();
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+      document.body.removeChild(box);
+      ok ? resolve() : reject();
+    });
+  }
+  document.querySelectorAll(".open-folder").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var path = btn.getAttribute("data-path") || "";
+      var note = document.querySelector(".copy-note") || (function () {
+        var el = document.createElement("div"); el.className = "copy-note";
+        btn.closest(".detail").appendChild(el); return el;
+      })();
+      if (!path) { note.textContent = "No folder to open yet."; return; }
+      mapincCopy(path).then(
+        function () { note.textContent = "Folder path copied — paste it into File Explorer if it does not open."; },
+        function () { note.textContent = "Could not copy automatically. Folder: " + path; });
+      try { window.open(mapincFileUrl(path), "_blank"); } catch (e) { /* blocked by the browser */ }
+    });
+  });
+
+  // Spinner while Word builds the PDF; also stops a double submit.
+  document.querySelectorAll("form.detail").forEach(function (form) {
+    if (!form.querySelector("button[type=submit]")) { return; }
+    form.addEventListener("submit", function () {
+      form.classList.add("busy");
+      var label = form.querySelector(".btn-label");
+      if (label) { label.textContent = "Creating PDF…"; }
+      setTimeout(function () { form.querySelectorAll("button").forEach(function (b) { b.disabled = true; }); }, 0);
+    });
+  });
+  // Coming back with the browser's Back button must not leave the form disabled.
+  window.addEventListener("pageshow", function () {
+    document.querySelectorAll("form.detail.busy").forEach(function (form) {
+      form.classList.remove("busy");
+      form.querySelectorAll("button").forEach(function (b) { b.disabled = false; });
+      var label = form.querySelector(".btn-label");
+      if (label) { label.textContent = "Save & Create PDF"; }
+    });
+  });
+</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

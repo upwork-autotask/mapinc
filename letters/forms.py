@@ -14,14 +14,23 @@ class LetterForm(forms.Form):
     dob = forms.DateField(label="Date of Birth", input_formats=DATE_INPUT_FORMATS,
                           widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}))
     admission = forms.CharField(label="Admission", max_length=200)
-    folder_name = forms.CharField(label="Folder", max_length=300)
+    # Filled by the Access/Outlook launcher with the whole destination path.
+    folder_name = forms.CharField(label="Folder", max_length=500)
     user = forms.CharField(required=False, widget=forms.HiddenInput)
     token = forms.CharField(required=False, widget=forms.HiddenInput)  # handoff token, consumed on save
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, editable=None, **kwargs):
+        """`editable` is the set of field names the user may change; None means all of them."""
         super().__init__(*args, **kwargs)
-        for field in self.fields.values():
+        self.editable = set(self.fields) if editable is None else set(editable)
+        for name, field in self.fields.items():
             field.widget.attrs.setdefault("autocomplete", "off")
+            if name not in self.editable and not isinstance(field.widget, forms.HiddenInput):
+                field.widget.attrs["readonly"] = "readonly"
+                field.widget.attrs["tabindex"] = "-1"
+
+    def locked(self, name: str) -> bool:
+        return name not in self.editable
 
 
 class AppSettingsForm(forms.ModelForm):
@@ -30,7 +39,7 @@ class AppSettingsForm(forms.ModelForm):
     class Meta:
         model = AppSettings
         fields = ["attn_default", "client_default", "doctor_default",
-                  "pdf_root_folder", "pdf_filename_pattern", "template"]
+                  "pdf_filename_pattern", "template"]
         widgets = {"template": forms.FileInput(attrs={"accept": ".docx"})}
 
     def clean_template(self):

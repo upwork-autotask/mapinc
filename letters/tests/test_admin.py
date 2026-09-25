@@ -15,7 +15,7 @@ W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 
 SETTINGS_POST = {
     "attn_default": "UR DEPT", "client_default": "WORLDTRIPS", "doctor_default": "RICHARD ABDALLAH",
-    "pdf_root_folder": r"C:\claims", "pdf_filename_pattern": AppSettings.DEFAULT_FILENAME_PATTERN, "_save": "Save",
+    "pdf_filename_pattern": AppSettings.DEFAULT_FILENAME_PATTERN, "_save": "Save",
 }
 
 
@@ -61,7 +61,7 @@ def test_settings_page_renders_and_saves(admin_client, app_settings):
     r = admin_client.post(url, SETTINGS_POST)
     assert r.status_code == 302
     s = AppSettings.load()
-    assert s.attn_default == "UR DEPT" and s.pdf_root_folder == r"C:\claims"
+    assert s.attn_default == "UR DEPT"
     assert s.template  # existing upload kept when no new file is sent
 
 
@@ -84,11 +84,11 @@ def test_template_upload_rejects_docx_missing_a_binding(admin_client, app_settin
 
 
 @pytest.mark.django_db
-def test_letters_list_and_regenerate_action(admin_client, app_settings, settings):
+def test_letters_list_and_regenerate_action(admin_client, app_settings, settings, claims_folder):
     settings.PDF_CONVERTER = "fake"
     letter = Letter.objects.create(
         case_encounter="E1", policy_id="P1", member_name="JOHN SMITH", dob=dt.date(1953, 5, 22),
-        admission="9/15/2026", attn="a", client="c", doctor="d", folder_name="SMITH",
+        admission="9/15/2026", attn="a", client="c", doctor="d", folder_name=str(claims_folder),
         pdf_path="", docx_path="", created_by="bob", modified_by="bob")
     r = admin_client.get(reverse("admin:letters_letter_changelist"))
     assert r.status_code == 200 and "JOHN SMITH" in r.content.decode()

@@ -15,9 +15,6 @@ class AppSettings(models.Model):
     client_default = models.CharField("Client default", max_length=200, default="WORLDTRIPS")
     doctor_default = models.CharField("Doctor default", max_length=200, default="RICHARD ABDALLAH",
                                       help_text='Printed after "Dr." in the letter.')
-    pdf_root_folder = models.CharField(
-        "PDF root folder", max_length=500, blank=True,
-        help_text=r"Local or UNC path, e.g. \\server\claims. Access passes the sub-folder name.")
     pdf_filename_pattern = models.CharField(
         "PDF filename pattern", max_length=200, default=DEFAULT_FILENAME_PATTERN,
         help_text="Placeholders: {member_name} {policy_id} {case_encounter} {MMDDYY} {YYYYMMDD}")
@@ -58,7 +55,8 @@ class Letter(models.Model):
     attn = models.CharField(max_length=200)
     client = models.CharField(max_length=200)
     doctor = models.CharField(max_length=200)
-    folder_name = models.CharField(max_length=300)
+    folder_name = models.CharField("Folder", max_length=500,
+                                   help_text="Full destination folder supplied by the launcher.")
     pdf_path = models.CharField(max_length=1000, blank=True)
     docx_path = models.CharField(max_length=1000, blank=True)
     created_by = models.CharField(max_length=150)

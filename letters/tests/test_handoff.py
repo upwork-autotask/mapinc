@@ -9,7 +9,7 @@ from django.utils import timezone
 from letters.models import Handoff, Letter
 
 DATA = {"case_encounter": "E-77", "policy_id": "WT-1", "member_name": "JOHN SMITH", "dob": "5/22/1953",
-        "admission": "9/15/2026", "folder_name": "SMITH_JOHN", "user": "DOM\\rabdallah"}
+        "admission": "9/15/2026", "folder_name": r"D:\claims\SMITH_JOHN", "user": "DOM\\rabdallah"}
 
 
 @pytest.mark.django_db
@@ -82,13 +82,14 @@ def test_ttl_comes_from_settings(settings):
 
 
 @pytest.mark.django_db
-def test_token_is_single_use_after_the_letter_is_saved(client, app_settings, settings):
+def test_token_is_single_use_after_the_letter_is_saved(client, app_settings, settings, claims_folder):
     settings.PDF_CONVERTER = "fake"
     url = client.post(reverse("letter_handoff"), DATA).content.decode().strip()
     r = client.get(url)
     token = r.context["form"].initial["token"]
     assert token and Handoff.objects.filter(token=token).exists()
-    r = client.post(reverse("letter_form"), {**DATA, "dob": "1953-05-22", "token": token})
+    r = client.post(reverse("letter_form"),
+                    {**DATA, "dob": "1953-05-22", "folder_name": str(claims_folder), "token": token})
     assert r.status_code == 200 and Letter.objects.filter(case_encounter="E-77").exists()
     assert not Handoff.objects.filter(token=token).exists()
     assert "expired" in client.get(url).content.decode()

@@ -23,7 +23,7 @@ a decision changes or a milestone lands. Last updated: 2026-09-19.
 | Values are written to both the control text and the bound document properties | Otherwise Word "refreshes" the controls back to the stored property values |
 | Letter key is `case_encounter` (one letter per encounter); `policy_id` is a plain field | Client's choice; a policy can have several encounters |
 | ATTN / Client / Doctor are admin defaults, not on the form; snapshotted onto each `Letter` | Client wanted them fixed; snapshot keeps history accurate if defaults change |
-| Access passes only a **folder name**; the PDF root folder lives in Settings | Client request; `..`, drive letters and absolute paths are rejected |
+| Access passes the **whole destination folder path**; the PDF-root setting was removed (2026-09-26) | Access already stores the full path per case. The form shows it read-only with an *Open folder* button; `MAPINC_ALLOWED_FOLDER_ROOTS` optionally limits where letters may be written, and relative paths / `..` are rejected |
 | Filled `.docx` is kept next to the PDF | So a letter can be hand-edited in Word if needed |
 | PDF conversion: Word COM with a process-wide lock, per-thread COM init, timeout + kill | Word automation is single-threaded and can hang |
 | Launchers POST values to `/letter/handoff/` and open `/letter/?t=<token>` | Keeps patient data out of URLs, window titles and browser history |
@@ -47,6 +47,18 @@ a decision changes or a milestone lands. Last updated: 2026-09-19.
   `ini_to_env`, `pip install -r requirements.txt`, `migrate`.
 - Server hardening phases 1, 2, 4, 5 (roles, TLS, firewall, IIS, backups, service)
   are scripted in `deploy/` but **not yet run** on the client server.
+
+## Recent changes
+- 2026-09-26: folder handling reworked (full path from the launcher, read-only
+  field, *Open folder* button that copies the path to the clipboard), spinner
+  while Word builds the PDF, `AppSettings.pdf_root_folder` removed
+  (migration `0005_folder_full_path`).
+- 2026-09-26: an existing letter opens in **view mode** — PDF details (name,
+  created/changed by and when) with *View PDF* / *Edit* / *Open folder*. *Edit*
+  (`?edit=1`) unlocks **Admission only** for ordinary users and **every field**
+  for a signed-in admin (`is_staff`). Locking is enforced server-side: posted
+  values for locked fields are replaced with the stored ones
+  (`_editable_fields()` in `letters/views.py`).
 
 ## Open items / next steps
 1. Client server: run the `deploy/` scripts in order (see `deploy/README.md`), then

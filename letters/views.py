@@ -29,6 +29,24 @@ QUERY_FIELDS = ("case_encounter", "policy_id", "member_name", "dob", "admission"
 LETTER_FIELDS = ("case_encounter", "policy_id", "member_name", "dob", "admission", "folder_name")
 
 
+def _is_admin(request) -> bool:
+    return request.user.is_authenticated and request.user.is_staff
+
+
+def _editable_fields(request, existing) -> set[str]:
+    """
+    New letter: everything except the folder, which the launcher supplies.
+    Existing letter: only the admission — unless an administrator is signed in,
+    who may correct every field (including the destination folder).
+    """
+    always = {"user", "token"}
+    if _is_admin(request):
+        return set(LETTER_FIELDS) | always
+    if existing is None:
+        return (set(LETTER_FIELDS) - {"folder_name"}) | always
+    return {"admission"} | always
+
+
 def _parse_dob(value: str):
     try:
         return LetterForm.base_fields["dob"].to_python(value)
@@ -73,13 +91,20 @@ def _initial_from_request(request) -> tuple[dict, bool]:
 def letter_form(request):
     context = {"app_settings": AppSettings.load()}
     if request.method == "POST":
-        form = LetterForm(request.POST)
+        existing = Letter.objects.filter(case_encounter=request.POST.get("case_encounter", "").strip()).first()
+        editable = _editable_fields(request, existing)
+        form = LetterForm(request.POST, editable=editable)
         if form.is_valid():
-            data = form.cleaned_data
+            data = dict(form.cleaned_data)
+            if existing is not None:
+                # A locked field keeps the value already on record, whatever was posted.
+                for name in LETTER_FIELDS:
+                    if name not in editable:
+                        data[name] = getattr(existing, name)
             windows_user = data.get("user", "")
             # A verified identity (app login or Windows auth) beats the launcher's self-reported name.
             actor = request.user.get_username() if request.user.is_authenticated else windows_user
-            existed = Letter.objects.filter(case_encounter=data["case_encounter"]).exists()
+            existed = existing is not None
             try:
                 letter = generate_letter(data, actor)
             except LetterGenerationError as exc:
@@ -94,8 +119,22 @@ def letter_form(request):
                 return render(request, "letters/success.html", {**context, "letter": letter})
     else:
         initial, expired = _initial_from_request(request)
-        form = LetterForm(initial=initial)
-        context["token_expired"] = expired
+        existing = Letter.objects.filter(case_encounter=initial.get("case_encounter", "")).first()
+        # A letter that already exists opens read-only; "Edit" (?edit=1) unlocks it.
+        edit_mode = existing is None or request.GET.get("edit") == "1"
+        editable = _editable_fields(request, existing) if edit_mode else set()
+        form = LetterForm(initial=initial, editable=editable)
+        context.update({
+            "token_expired": expired,
+            "existing": existing,
+            "edit_mode": edit_mode,
+            "is_admin": _is_admin(request),
+            "pdf_exists": bool(existing and existing.pdf_path and Path(existing.pdf_path).is_file()),
+            "pdf_name": Path(existing.pdf_path).name if existing and existing.pdf_path else "",
+            # auto_now / auto_now_add differ by microseconds on a fresh row, so allow a second
+            "was_edited": bool(existing and ((existing.modified_at - existing.created_at).total_seconds() > 1
+                                             or existing.modified_by != existing.created_by)),
+        })
         if initial.get("case_encounter"):
             audit.record(request, Action.FORM_OPENED, case_encounter=initial["case_encounter"],
                          detail="token" if request.GET.get("t") else "query",
@@ -115,7 +154,7 @@ def letter_pdf(request, case_encounter: str):
 
 SETTINGS_GROUPS = (
     ("Letter defaults", ("attn_default", "client_default", "doctor_default")),
-    ("PDF output", ("pdf_root_folder", "pdf_filename_pattern")),
+    ("PDF output", ("pdf_filename_pattern",)),
     ("Word template", ("template",)),
 )
 

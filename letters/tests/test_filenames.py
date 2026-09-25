@@ -25,17 +25,35 @@ def test_safe_component_strips_illegal_characters():
     assert safe_component("...") == "_"
 
 
-def test_resolve_folder_joins_nested_names():
-    assert resolve_folder(r"\server\claims", "2026/SMITH_JOHN") == Path(r"\server\claims\2026\SMITH_JOHN")
-    assert resolve_folder(r"C:\claims", "SMITH_JOHN") == Path(r"C:\claims\SMITH_JOHN")
+# --- resolve_folder now takes the whole destination path ----------------------
+
+def test_accepts_a_drive_path():
+    assert resolve_folder(r"D:\claims\SMITH_JOHN") == Path(r"D:\claims\SMITH_JOHN")
 
 
-@pytest.mark.parametrize("bad", ["", "   ", "..", r"..\other", r"a\..\b", r"C:\x", r"\other\share", "/abs", r"\abs"])
-def test_resolve_folder_rejects_escapes(bad):
+def test_accepts_a_unc_path():
+    assert resolve_folder(r"\\server\claims\2026\SMITH_JOHN") == Path(r"\\server\claims\2026\SMITH_JOHN")
+
+
+def test_accepts_forward_slashes_quotes_and_trailing_separator():
+    assert resolve_folder('  "D:/claims/SMITH_JOHN/"  ') == Path(r"D:\claims\SMITH_JOHN")
+
+
+@pytest.mark.parametrize("bad", ["", "   ", "SMITH_JOHN", r"claims\SMITH", r"\claims\SMITH",
+                                 r"D:\claims\..\windows", r"\\server", "/mnt/claims"])
+def test_rejects_anything_that_is_not_a_full_windows_path(bad):
     with pytest.raises(InvalidFolderName):
-        resolve_folder(r"C:\claims", bad)
+        resolve_folder(bad)
 
 
-def test_resolve_folder_requires_root():
-    with pytest.raises(InvalidFolderName):
-        resolve_folder("", "SMITH")
+def test_allowed_roots_restrict_where_letters_may_be_written(settings):
+    settings.MAPINC_ALLOWED_FOLDER_ROOTS = [r"D:\claims", r"\\server\claims"]
+    assert resolve_folder(r"D:\claims\SMITH") == Path(r"D:\claims\SMITH")
+    assert resolve_folder(r"\\SERVER\Claims\Smith") == Path(r"\\SERVER\Claims\Smith")  # case-insensitive
+    with pytest.raises(InvalidFolderName, match="not an allowed"):
+        resolve_folder(r"D:\other\SMITH")
+
+
+def test_no_allowed_roots_means_any_full_path(settings):
+    settings.MAPINC_ALLOWED_FOLDER_ROOTS = []
+    assert resolve_folder(r"E:\anywhere") == Path(r"E:\anywhere")

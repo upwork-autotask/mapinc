@@ -16,7 +16,7 @@ database locked down so that nothing else can get at the data directly.
 |---|---|---|---|
 | PostgreSQL `letters_letter` | member name, DOB, policy ID, admission, case no. | plain, role has `CREATEDB` | least-privilege roles, SSL-only, BitLocker |
 | PostgreSQL `letters_handoff` | same values, 15-minute stash | plain | single-use, 5-minute TTL, purged |
-| PDF root folder | the letters (.pdf + .docx) | NTFS defaults | NTFS ACL to the clinical group only, BitLocker |
+| Claims folders (full path supplied by the launcher) | the letters (.pdf + .docx) | NTFS defaults | NTFS ACL to the clinical group only, BitLocker, `MAPINC_ALLOWED_FOLDER_ROOTS` |
 | `media/templates/` | letter template (no PHI) | — | — |
 | Server RAM / temp | Word conversion | — | temp files deleted after conversion (already) |
 | Browser on staff PCs | letter form pages | token links only (no PHI in URLs) | HTTPS, no caching headers |

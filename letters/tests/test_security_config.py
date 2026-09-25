@@ -21,10 +21,11 @@ def test_static_files_are_cacheable(client):
 
 
 @pytest.mark.django_db
-def test_pdf_download_is_never_cached(client, app_settings, settings):
+def test_pdf_download_is_never_cached(client, app_settings, settings, claims_folder):
     settings.PDF_CONVERTER = "fake"
     client.post(reverse("letter_form"), {"case_encounter": "E1", "policy_id": "P1", "member_name": "A B",
-                                         "dob": "1953-05-22", "admission": "x", "folder_name": "F"})
+                                         "dob": "1953-05-22", "admission": "x",
+                                         "folder_name": str(claims_folder)})
     r = client.get(reverse("letter_pdf", args=["E1"]))
     assert r.status_code == 200 and "no-store" in r["Cache-Control"]
 

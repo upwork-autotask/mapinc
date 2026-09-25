@@ -5,12 +5,42 @@
     {% csrf_token %}
     {% if token_expired %}<div class="msgbar">This link has expired. Please open the letter again from Access or Outlook, or type the values below.</div>{% endif %}
     {% if form.non_field_errors %}<div class="msgbar">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+
+    {% if existing %}
+      <div class="pdf-panel">
+        <div class="pdf-title">{% if pdf_exists %}PDF already created{% else %}Letter on record{% endif %}</div>
+        {% if pdf_exists %}
+          <div class="path">{{ pdf_name }}</div>
+        {% else %}
+          <div class="warn">The PDF is no longer in the folder ({{ existing.pdf_path }}). Edit and save to create it again.</div>
+        {% endif %}
+        <div class="muted">
+          Created by {{ existing.created_by }} on {{ existing.created_at|date:"n/j/Y g:i A" }}
+          {% if was_edited %}&middot; last changed by {{ existing.modified_by }} on {{ existing.modified_at|date:"n/j/Y g:i A" }}{% endif %}
+        </div>
+        <div class="buttons folder-line">
+          {% if pdf_exists %}<a class="button default" href="{% url 'letter_pdf' existing.case_encounter %}" target="_blank" rel="noopener">View PDF</a>{% endif %}
+          {% if not edit_mode %}<a class="button" href="?case_encounter={{ existing.case_encounter|urlencode }}&amp;edit=1{% if form.user.value %}&amp;user={{ form.user.value|urlencode }}{% endif %}">Edit</a>{% endif %}
+          <button type="button" class="small open-folder" data-path="{{ existing.folder_name }}"
+                  title="Copy the folder path and try to open it in File Explorer">Open folder</button>
+        </div>
+      </div>
+      {% if edit_mode %}
+        <div class="msgbar edit-note">
+          {% if is_admin %}Editing as an administrator — every field can be changed.
+          {% else %}Editing — only <strong>Admission</strong> can be changed. Sign in as an administrator to change the rest.{% endif %}
+        </div>
+      {% endif %}
+    {% endif %}
+
     {% for field in form.visible_fields %}
       <div class="row{% if field.errors %} has-error{% endif %}">
         <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
         {% if field.name == "folder_name" %}
           <div class="folder">
-            <span class="root" title="Root folder from admin settings">{{ app_settings.pdf_root_folder|default:"(root folder not set)" }}\</span>{{ field }}
+            {{ field }}
+            <button type="button" class="small open-folder" data-path="{{ field.value|default:'' }}"
+                    title="Copy the folder path and try to open it in File Explorer">Open folder</button>
           </div>
         {% else %}
           {{ field }}
@@ -19,21 +49,28 @@
       </div>
     {% endfor %}
     {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+
     <div class="footer-note">ATTN: {{ app_settings.attn_default }} &middot; Client: {{ app_settings.client_default }} &middot; Dr. {{ app_settings.doctor_default }}</div>
     <div class="buttons">
-      <button type="submit" class="default">Save &amp; Create PDF</button>
-      <button type="button" onclick="window.close()">Cancel</button>
+      {% if edit_mode %}
+        <button type="submit" class="default"><span class="spinner" aria-hidden="true"></span><span class="btn-label">Save &amp; {% if existing %}Replace{% else %}Create{% endif %} PDF</span></button>
+      {% endif %}
+      <button type="button" onclick="window.close()">{% if edit_mode %}Cancel{% else %}Close{% endif %}</button>
     </div>
+    <div class="busy-note">Creating the PDF with Word — this takes a few seconds.</div>
   </form>
 {% endblock %}
 
 {% block scripts %}
 <script>
-  // Enter in any text box submits (Access behaviour); the first empty box gets focus.
-  document.querySelectorAll('.detail input[type=text]').forEach(function (el) {
+  // Enter in an editable text box submits (Access behaviour); the first one gets focus.
+  document.querySelectorAll('.detail input[type=text]:not([readonly])').forEach(function (el) {
     el.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); el.form.requestSubmit(); } });
   });
-  var first = Array.prototype.find.call(document.querySelectorAll('.detail input:not([type=hidden])'), function (el) { return !el.value; });
-  (first || document.querySelector('.detail input:not([type=hidden])')).focus();
+  var boxes = document.querySelectorAll('.detail input:not([type=hidden]):not([readonly])');
+  if (boxes.length) {
+    var first = Array.prototype.find.call(boxes, function (el) { return !el.value; });
+    (first || boxes[0]).focus();
+  }
 </script>
 {% endblock %}

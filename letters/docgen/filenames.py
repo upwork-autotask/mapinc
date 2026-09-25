@@ -1,9 +1,12 @@
-"""Filename pattern expansion and safe sub-folder resolution."""
+"""Filename pattern expansion and validation of the destination folder."""
 import re
 from datetime import date
 from pathlib import Path
 
-_ILLEGAL = re.compile(r'[<>:"/\|?*\x00-\x1f]')
+from django.conf import settings
+
+_ILLEGAL = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+_DRIVE = re.compile(r"^[A-Za-z]:\\")
 
 
 class InvalidFolderName(ValueError):
@@ -29,16 +32,37 @@ def build_filename(pattern: str, *, member_name: str, policy_id: str, case_encou
     return name
 
 
-def resolve_folder(root: str, folder_name: str) -> Path:
-    """Join `folder_name` (from the query string) under `root` (from admin settings), refusing escapes."""
-    if not (root or "").strip():
-        raise InvalidFolderName("PDF root folder is not set. Set it in admin > Settings.")
-    name = (folder_name or "").strip().replace("/", "\\")
-    if not name:
-        raise InvalidFolderName("Folder name is required.")
-    if name.startswith("\\"):
-        raise InvalidFolderName("Folder name must be a sub-folder name, not an absolute path.")
-    parts = [p.strip() for p in name.split("\\") if p.strip()]
-    if any(p == ".." or ":" in p for p in parts):
-        raise InvalidFolderName("Folder name may not contain '..' or a drive letter.")
-    return Path(root.strip()).joinpath(*parts)
+def resolve_folder(folder_path: str, allowed_roots: list[str] | None = None) -> Path:
+    """
+    Validate the destination folder the launcher supplied. It is the whole path —
+    a drive path (D:\claims\SMITH) or a UNC path (\\server\claims\SMITH).
+    MAPINC_ALLOWED_FOLDER_ROOTS, when set, limits where letters may be written.
+    """
+    raw = (folder_path or "").strip().strip('"').strip()
+    if not raw:
+        raise InvalidFolderName("Folder is required. Open the letter from Access or Outlook so it is filled in.")
+
+    path_text = raw.replace("/", "\\")
+    is_unc = path_text.startswith("\\\\") and len([p for p in path_text[2:].split("\\") if p]) >= 2
+    if not (_DRIVE.match(path_text) or is_unc):
+        raise InvalidFolderName(
+            "Folder must be a full path, for example \\\\server\\claims\\SMITH_JOHN or D:\\claims\\SMITH_JOHN.")
+    if any(part == ".." for part in path_text.split("\\")):
+        raise InvalidFolderName("Folder path may not contain '..'.")
+
+    trimmed = path_text.rstrip("\\")
+    if is_unc and len(trimmed) < 3:
+        raise InvalidFolderName("Folder must include the share name, for example \\\\server\\claims.")
+    folder = Path(trimmed)
+
+    roots = settings.MAPINC_ALLOWED_FOLDER_ROOTS if allowed_roots is None else allowed_roots
+    if roots and not any(_is_within(trimmed, root) for root in roots):
+        raise InvalidFolderName(
+            f"{folder} is not an allowed folder. Letters may only be written under: " + ", ".join(roots))
+    return folder
+
+
+def _is_within(path_text: str, root: str) -> bool:
+    candidate = path_text.replace("/", "\\").rstrip("\\").casefold()
+    base = (root or "").strip().replace("/", "\\").rstrip("\\").casefold()
+    return bool(base) and (candidate == base or candidate.startswith(base + "\\"))

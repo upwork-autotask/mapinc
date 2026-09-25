@@ -8,7 +8,10 @@ Option Explicit
 ' Install: VBA editor > File > Import File... > this .bas file, then set
 ' LETTER_BASE_URL below. From a button on your case form call:
 '
-'   OpenClinicalsLetterDialog Me.CaseEncounter, Me.PolicyID, Me.MemberName, Me.DOB, Me.Admission, Me.FolderName
+'   OpenClinicalsLetterDialog Me.CaseEncounter, Me.PolicyID, Me.MemberName, Me.DOB, Me.Admission, Me.FolderPath
+'
+' The last argument is the WHOLE destination folder, e.g. \\server\claims\SMITH_JOHN.
+' The letter (.pdf and .docx) is written into it; the web form shows it read-only.
 '
 ' For a TRUE Access modal dialog (Microsoft 365 Access, build 2303 or newer),
 ' see OpenClinicalsLetterInAccessForm at the bottom of this module.
@@ -60,7 +63,7 @@ Public Sub OpenLetterFromPrompt()
     memberName = InputBox("Member name:", "Clinicals Request")
     dob = InputBox("Date of birth (m/d/yyyy):", "Clinicals Request")
     admission = InputBox("Admission (date or status):", "Clinicals Request")
-    folderName = InputBox("Folder name (sub-folder under the PDF root):", "Clinicals Request", memberName)
+    folderName = InputBox("Destination folder (full path):", "Clinicals Request")
     OpenClinicalsLetterDialog caseEncounter, policyId, memberName, dob, admission, folderName
 End Sub
 

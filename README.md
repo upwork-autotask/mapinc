@@ -38,15 +38,22 @@ Then open:
 |---|---|
 | Letter form (what Access opens) | `http://<server>:8000/letter/` |
 | Login | `http://<server>:8000/login/` |
-| Settings — defaults, **PDF root folder**, filename pattern, Word template | `http://<server>:8000/settings/` |
+| Settings — letter defaults, filename pattern, Word template | `http://<server>:8000/settings/` |
 | Letters — history, search, Open PDF, Edit | `http://<server>:8000/letters/` |
 | Django admin — users, Regenerate PDF action | `http://<server>:8000/admin/` |
 
 `<server>` is `localhost` on the machine itself, or the server's name / IP from
 other PCs on the LAN (allow TCP 8000 through Windows Firewall for that).
 
-Before the first letter: log in and set the **PDF root folder** in Settings
-(e.g. `\\server\claims`).
+Opening a case that already has a letter shows the PDF that is on record —
+file name, who created it and when — with **View PDF**, **Edit** and **Open
+folder** buttons. Edit lets an ordinary user change only **Admission**; an
+administrator signed in to the app can change every field. Saving replaces the
+PDF and records the change in the audit log.
+
+The destination folder comes from the launcher with every letter, so there is
+nothing to set up before the first letter. To restrict where letters may be
+written, list the permitted folders in `MAPINC_ALLOWED_FOLDER_ROOTS`.
 
 **Stopping:** press `Ctrl+C` in the `run.bat` window, or close it.
 
@@ -73,8 +80,8 @@ true Access modal form using the Edge Browser Control for Microsoft 365 Access).
 
 **From Outlook (or Excel/Word) VBA:** import `outlook/LetterLauncher_Outlook.bas`
 instead — same `OpenClinicalsLetterDialog` / `OpenClinicalsLetter` calls with no
-Access dependencies, plus an `OpenLetterFromPrompt` macro for a ribbon button. Access passes the sub-folder name; the PDF is written to
-`<PDF root folder>\<folder name>\CLINICALS REQUEST-<member>-SENT<mmddyy>.pdf`
+Access dependencies, plus an `OpenLetterFromPrompt` macro for a ribbon button. Access passes the whole destination folder (e.g. `\\server\claims\SMITH_JOHN`); the PDF is written to
+`<folder>\CLINICALS REQUEST-<member>-SENT<mmddyy>.pdf`
 (the filled `.docx` is kept next to it). The Windows user name is recorded as
 created/modified by. Opening the form again for the same case/encounter loads the
 saved letter for editing; saving overwrites the PDF and updates the audit fields.
@@ -107,6 +114,7 @@ variable always overrides the file. `MAPINC_ENV_FILE` points at a different file
 | `MAPINC_LOCKOUT_FAILURES`, `MAPINC_LOCKOUT_MINUTES` | account lockout after failed sign-ins (5 / 15) |
 | `MAPINC_ALLOW_QUERY_PREFILL` | allow PHI in the URL query string (dev only; launchers use handoff tokens) |
 | `MAPINC_HANDOFF_ALLOWED_NETWORKS`, `MAPINC_HANDOFF_MINUTES` | who may create handoff links and how long they live |
+| `MAPINC_ALLOWED_FOLDER_ROOTS` | folders letters may be written under (empty = wherever the launcher says) |
 | `MAPINC_LISTEN` | address Waitress binds (`run.bat`; `127.0.0.1:8000` behind IIS) |
 
 ## HIPAA hardening
