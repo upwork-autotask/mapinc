@@ -123,3 +123,12 @@ def test_purge_handoffs_command():
     call_command("purge_handoffs")
     assert Handoff.objects.filter(token=fresh).exists()
     assert not Handoff.objects.filter(token=stale).exists()
+
+
+@pytest.mark.django_db
+def test_handoff_carries_the_extra_case_fields(client, app_settings):
+    url = client.post(reverse("letter_handoff"),
+                      {**DATA, "case_location": "MIAMI", "case_type": "INPATIENT"}).content.decode().strip()
+    initial = client.get(url).context["form"].initial
+    assert initial["case_location"] == "MIAMI" and initial["case_type"] == "INPATIENT"
+    assert "MIAMI" not in url

@@ -1,6 +1,7 @@
 from django import forms
 from django.db.models.fields.files import FieldFile
 
+from .docgen.filenames import ALLOWED_PLACEHOLDERS, unknown_placeholders
 from .docgen.template_fill import missing_bindings
 from .models import AppSettings
 
@@ -14,6 +15,9 @@ class LetterForm(forms.Form):
     dob = forms.DateField(label="Date of Birth", input_formats=DATE_INPUT_FORMATS,
                           widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}))
     admission = forms.CharField(label="Admission", max_length=200)
+    # Supplied by the launcher for the PDF file name; not printed on the letter.
+    case_location = forms.CharField(label="Case Location", max_length=100, required=False)
+    case_type = forms.CharField(label="Case Type", max_length=100, required=False)
     # Filled by the Access/Outlook launcher with the whole destination path.
     folder_name = forms.CharField(label="Folder", max_length=500)
     user = forms.CharField(required=False, widget=forms.HiddenInput)
@@ -41,6 +45,16 @@ class AppSettingsForm(forms.ModelForm):
         fields = ["attn_default", "client_default", "doctor_default",
                   "pdf_filename_pattern", "template"]
         widgets = {"template": forms.FileInput(attrs={"accept": ".docx"})}
+
+    def clean_pdf_filename_pattern(self):
+        pattern = (self.cleaned_data.get("pdf_filename_pattern") or "").strip()
+        unknown = unknown_placeholders(pattern)
+        if unknown:
+            raise forms.ValidationError(
+                "This pattern uses %(unknown)s, which the app cannot fill. Use only: %(allowed)s",
+                params={"unknown": ", ".join(unknown),
+                        "allowed": ", ".join("{" + name + "}" for name in ALLOWED_PLACEHOLDERS)})
+        return pattern
 
     def clean_template(self):
         upload = self.cleaned_data.get("template")

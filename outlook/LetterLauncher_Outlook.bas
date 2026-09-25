@@ -17,6 +17,9 @@ Option Explicit
 '   OpenClinicalsLetterDialog "E-2001", "WT-123456", "JOHN SMITH", #5/22/1953#, "9/15/2026", _
 '                             "\\server\claims\SMITH_JOHN"
 '
+' caseLocation and caseType are optional; they are stored with the letter and
+' can appear in the PDF file name (Settings > PDF filename pattern).
+'
 ' The last argument is the WHOLE destination folder; the letter (.pdf and .docx)
 ' is written into it, and the web form shows it read-only.
 '
@@ -61,6 +64,7 @@ Private Const SW_SHOWNORMAL As Long = 1
 Public Sub OpenLetterFromPrompt()
     Dim caseEncounter As String, policyId As String, memberName As String
     Dim dob As String, admission As String, folderName As String
+    Dim caseLocation As String, caseType As String
     caseEncounter = InputBox("Case / Encounter number:", "Clinicals Request")
     If Len(caseEncounter) = 0 Then Exit Sub
     policyId = InputBox("Policy ID No.:", "Clinicals Request")
@@ -68,15 +72,20 @@ Public Sub OpenLetterFromPrompt()
     dob = InputBox("Date of birth (m/d/yyyy):", "Clinicals Request")
     admission = InputBox("Admission (date or status):", "Clinicals Request")
     folderName = InputBox("Destination folder (full path):", "Clinicals Request")
-    OpenClinicalsLetterDialog caseEncounter, policyId, memberName, dob, admission, folderName
+    caseLocation = InputBox("Case location (optional, used in the file name):", "Clinicals Request")
+    caseType = InputBox("Case type (optional, used in the file name):", "Clinicals Request")
+    OpenClinicalsLetterDialog caseEncounter, policyId, memberName, dob, admission, folderName, _
+                              caseLocation, caseType
 End Sub
 
 ' Opens the letter form in a new dialog-sized window and waits until it is closed.
 Public Sub OpenClinicalsLetterDialog(ByVal caseEncounter As Variant, ByVal policyId As Variant, _
                                      ByVal memberName As Variant, ByVal dob As Variant, _
-                                     ByVal admission As Variant, ByVal folderName As Variant)
+                                     ByVal admission As Variant, ByVal folderName As Variant, _
+                                     Optional ByVal caseLocation As Variant = "", _
+                                     Optional ByVal caseType As Variant = "")
     Dim url As String, pid As Double
-    url = RequestHandoffUrl(caseEncounter, policyId, memberName, dob, admission, folderName)
+    url = RequestHandoffUrl(caseEncounter, policyId, memberName, dob, admission, folderName, caseLocation, caseType)
     If Len(url) = 0 Then Exit Sub
     pid = LaunchDialogWindow(url)
     If pid > 0 Then WaitForProcess pid
@@ -85,9 +94,11 @@ End Sub
 ' Opens the letter form in a new dialog-sized window and returns immediately.
 Public Sub OpenClinicalsLetter(ByVal caseEncounter As Variant, ByVal policyId As Variant, _
                                ByVal memberName As Variant, ByVal dob As Variant, _
-                               ByVal admission As Variant, ByVal folderName As Variant)
+                               ByVal admission As Variant, ByVal folderName As Variant, _
+                               Optional ByVal caseLocation As Variant = "", _
+                               Optional ByVal caseType As Variant = "")
     Dim url As String
-    url = RequestHandoffUrl(caseEncounter, policyId, memberName, dob, admission, folderName)
+    url = RequestHandoffUrl(caseEncounter, policyId, memberName, dob, admission, folderName, caseLocation, caseType)
     If Len(url) > 0 Then LaunchDialogWindow url
 End Sub
 
@@ -97,7 +108,9 @@ End Sub
 
 Private Function RequestHandoffUrl(ByVal caseEncounter As Variant, ByVal policyId As Variant, _
                                    ByVal memberName As Variant, ByVal dob As Variant, _
-                                   ByVal admission As Variant, ByVal folderName As Variant) As String
+                                   ByVal admission As Variant, ByVal folderName As Variant, _
+                                   Optional ByVal caseLocation As Variant = "", _
+                                   Optional ByVal caseType As Variant = "") As String
     Dim http As Object, body As String
     body = "case_encounter=" & UrlEnc(NzS(caseEncounter)) & _
            "&policy_id=" & UrlEnc(NzS(policyId)) & _
@@ -105,6 +118,8 @@ Private Function RequestHandoffUrl(ByVal caseEncounter As Variant, ByVal policyI
            "&dob=" & UrlEnc(FormatDob(dob)) & _
            "&admission=" & UrlEnc(NzS(admission)) & _
            "&folder_name=" & UrlEnc(NzS(folderName)) & _
+           "&case_location=" & UrlEnc(NzS(caseLocation)) & _
+           "&case_type=" & UrlEnc(NzS(caseType)) & _
            "&user=" & UrlEnc(Environ("USERNAME"))
     On Error GoTo Failed
     Set http = CreateObject("WinHttp.WinHttpRequest.5.1")

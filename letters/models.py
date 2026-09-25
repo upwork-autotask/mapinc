@@ -9,7 +9,8 @@ from django.utils import timezone
 class AppSettings(models.Model):
     """Single-row table edited in admin. Always access it via AppSettings.load()."""
 
-    DEFAULT_FILENAME_PATTERN = "CLINICALS REQUEST-{member_name}-SENT{MMDDYY}.pdf"
+    DEFAULT_FILENAME_PATTERN = ("{case_encounter}-{case_location}-{case_type}-CLINICALS REQUEST-"
+                                "{member_name}-SENT{MMDDYY}-{user}.pdf")
 
     attn_default = models.CharField("ATTN default", max_length=200, default="UR DEPARTMENT")
     client_default = models.CharField("Client default", max_length=200, default="WORLDTRIPS")
@@ -17,7 +18,9 @@ class AppSettings(models.Model):
                                       help_text='Printed after "Dr." in the letter.')
     pdf_filename_pattern = models.CharField(
         "PDF filename pattern", max_length=200, default=DEFAULT_FILENAME_PATTERN,
-        help_text="Placeholders: {member_name} {policy_id} {case_encounter} {MMDDYY} {YYYYMMDD}")
+        help_text="Placeholders: {case_encounter} {policy_id} {member_name} {case_location} "
+                  "{case_type} {user} {MMDDYY} {YYYYMMDD}. Values the launcher did not send are "
+                  "left out and the extra separators removed.")
     template = models.FileField("Word template (.docx)", upload_to="templates/", blank=True)
 
     class Meta:
@@ -51,6 +54,9 @@ class Letter(models.Model):
     member_name = models.CharField(max_length=200)
     dob = models.DateField("Date of birth")
     admission = models.CharField(max_length=200)
+    # extra values the launcher supplies; used in the PDF file name, not printed on the letter
+    case_location = models.CharField("Case location", max_length=100, blank=True)
+    case_type = models.CharField("Case type", max_length=100, blank=True)
     # snapshot of the defaults used at generation time
     attn = models.CharField(max_length=200)
     client = models.CharField(max_length=200)

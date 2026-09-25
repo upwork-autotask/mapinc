@@ -89,8 +89,23 @@ saved letter for editing; saving overwrites the PDF and updates the audit fields
 The launchers do not put patient data in the URL: they `POST` the values to
 `/letter/handoff/` and open the short-lived link it returns (`/letter/?t=<token>`,
 valid 15 minutes) in a new chromeless Edge window. The plain query-string form
-still works for testing (all values editable on the form):
-`/letter/?case_encounter=…&policy_id=…&member_name=…&dob=yyyy-mm-dd&admission=…&folder_name=…&user=…`
+still works for testing:
+`/letter/?case_encounter=…&policy_id=…&member_name=…&dob=yyyy-mm-dd&admission=…&case_location=…&case_type=…&folder_name=…&user=…`
+
+### PDF file name
+Settings → **PDF filename pattern** builds the file name. Placeholders:
+`{case_encounter}` `{policy_id}` `{member_name}` `{case_location}` `{case_type}`
+`{user}` (who saved it, without the domain) `{MMDDYY}` `{YYYYMMDD}`. The default is
+
+    {case_encounter}-{case_location}-{case_type}-CLINICALS REQUEST-{member_name}-SENT{MMDDYY}-{user}.pdf
+
+Values the launcher did not send are left out and the extra separators removed.
+A placeholder the app cannot fill is refused when the pattern is saved, and a
+pattern already on record that cannot be filled is reported on the form instead
+of failing the request.
+
+`case_location` and `case_type` come from the launcher and are stored with the
+letter; they appear in the file name only — they are not printed on the letter.
 
 ## Configuration (environment variables)
 All settings are `MAPINC_*` environment variables. For convenience they are read

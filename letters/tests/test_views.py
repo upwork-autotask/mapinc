@@ -195,3 +195,27 @@ def test_an_administrator_may_post_changes_to_every_field(client, app_settings, 
     assert r.status_code == 200
     letter = Letter.objects.get()
     assert letter.member_name == "JANE SMITH" and Path(letter.pdf_path).parent == other
+
+
+# --- extra case fields supplied by the launcher ------------------------------
+
+@pytest.mark.django_db
+def test_case_location_and_type_are_prefilled_and_saved(client, app_settings, VALID):
+    extras = {"case_location": "MIAMI", "case_type": "INPATIENT"}
+    r = client.get(reverse("letter_form"), {**VALID, **extras})
+    assert r.context["form"].initial["case_location"] == "MIAMI"
+    assert r.context["form"].initial["case_type"] == "INPATIENT"
+    assert "Case Location" in r.content.decode()
+
+    client.post(reverse("letter_form"), {**VALID, **extras})
+    letter = Letter.objects.get()
+    assert (letter.case_location, letter.case_type) == ("MIAMI", "INPATIENT")
+
+
+@pytest.mark.django_db
+def test_extra_case_fields_are_locked_for_ordinary_users_once_the_letter_exists(client, app_settings, VALID):
+    client.post(reverse("letter_form"), {**VALID, "case_location": "MIAMI", "case_type": "INPATIENT"})
+    html = client.get(reverse("letter_form"), {"case_encounter": "E1", "edit": "1"}).content.decode()
+    assert "readonly" in _input_line(html, "case_location")
+    client.post(reverse("letter_form"), {**VALID, "case_location": "ORLANDO", "case_type": "OUTPATIENT"})
+    assert Letter.objects.get().case_location == "MIAMI"

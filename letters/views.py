@@ -25,8 +25,10 @@ from .models import AppSettings, AuditEvent, Handoff, Letter
 
 Action = AuditEvent.Action
 
-QUERY_FIELDS = ("case_encounter", "policy_id", "member_name", "dob", "admission", "folder_name", "user")
-LETTER_FIELDS = ("case_encounter", "policy_id", "member_name", "dob", "admission", "folder_name")
+QUERY_FIELDS = ("case_encounter", "policy_id", "member_name", "dob", "admission",
+                "case_location", "case_type", "folder_name", "user")
+LETTER_FIELDS = ("case_encounter", "policy_id", "member_name", "dob", "admission",
+                 "case_location", "case_type", "folder_name")
 
 
 def _is_admin(request) -> bool:

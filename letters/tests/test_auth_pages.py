@@ -101,3 +101,13 @@ def test_admin_login_uses_branded_page(client):
 def test_admin_pages_show_logo(client, staff):
     client.force_login(staff)
     assert "map_logo.jpg" in client.get("/admin/").content.decode()
+
+
+@pytest.mark.django_db
+def test_settings_page_rejects_an_unknown_filename_placeholder(client, staff, app_settings):
+    client.force_login(staff)
+    r = client.post(reverse("settings"), {**SETTINGS_POST, "pdf_filename_pattern": "{map_id}-{member_name}.pdf"})
+    assert r.status_code == 200
+    html = r.content.decode()
+    assert "map_id" in html and "{case_encounter}" in html
+    assert AppSettings.load().pdf_filename_pattern == AppSettings.DEFAULT_FILENAME_PATTERN

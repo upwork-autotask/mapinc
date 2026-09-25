@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from letters.models import AppSettings, Letter
 
-from .filenames import InvalidFolderName, build_filename, resolve_folder
+from .filenames import InvalidFilenamePattern, InvalidFolderName, build_filename, resolve_folder
 from .pdf_convert import ConversionError, convert
 from .template_fill import fill_template
 
@@ -39,9 +39,14 @@ def generate_letter(data: dict, windows_user: str) -> Letter:
         raise LetterGenerationError(str(exc)) from exc
 
     docx_bytes = fill_template(template, values)
-    pdf_path = folder / build_filename(
-        s.pdf_filename_pattern, member_name=data["member_name"], policy_id=data["policy_id"],
-        case_encounter=data["case_encounter"], today=timezone.localdate())
+    try:
+        filename = build_filename(
+            s.pdf_filename_pattern, member_name=data["member_name"], policy_id=data["policy_id"],
+            case_encounter=data["case_encounter"], case_location=data.get("case_location", ""),
+            case_type=data.get("case_type", ""), user=windows_user, today=timezone.localdate())
+    except InvalidFilenamePattern as exc:
+        raise LetterGenerationError(str(exc)) from exc
+    pdf_path = folder / filename
     docx_path = pdf_path.with_suffix(".docx")
 
     try:
@@ -62,6 +67,8 @@ def generate_letter(data: dict, windows_user: str) -> Letter:
         letter.member_name = data["member_name"]
         letter.dob = data["dob"]
         letter.admission = data["admission"]
+        letter.case_location = data.get("case_location", "")
+        letter.case_type = data.get("case_type", "")
         letter.attn, letter.client, letter.doctor = values["attn"], values["client"], values["doctor"]
         letter.folder_name = data["folder_name"]
         letter.pdf_path = str(pdf_path)

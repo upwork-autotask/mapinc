@@ -28,7 +28,9 @@ def test_creates_letter_files_and_audit_fields(app_settings, DATA, claims_folder
     letter = generate_letter(DATA, "DOMAIN\\rabdallah")
     pdf = Path(letter.pdf_path)
     assert pdf.parent == claims_folder
-    assert pdf.name.startswith("CLINICALS REQUEST-JOHN SMITH-SENT") and pdf.suffix == ".pdf"
+    # default pattern: case, letter title, member, date, who saved it (blank case values dropped)
+    assert pdf.name.startswith("E-100-CLINICALS REQUEST-JOHN SMITH-SENT") and pdf.suffix == ".pdf"
+    assert pdf.name.endswith("-rabdallah.pdf")
     assert pdf.read_bytes().startswith(b"%PDF")
     assert Path(letter.docx_path) == pdf.with_suffix(".docx") and Path(letter.docx_path).exists()
     assert (letter.attn, letter.client, letter.doctor) == ("UR DEPARTMENT", "WORLDTRIPS", "RICHARD ABDALLAH")
@@ -95,3 +97,24 @@ def test_converter_failure_saves_nothing(app_settings, DATA, monkeypatch):
 def test_missing_required_field(app_settings, DATA):
     with pytest.raises(LetterGenerationError, match="member_name"):
         generate_letter({**DATA, "member_name": ""}, "u")
+
+
+@pytest.mark.django_db
+def test_unknown_filename_placeholder_is_a_user_error(app_settings, DATA):
+    app_settings.pdf_filename_pattern = "{map_id}-{member_name}.pdf"
+    app_settings.save()
+    with pytest.raises(LetterGenerationError, match="map_id"):
+        generate_letter(DATA, "u")
+    assert Letter.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_case_location_and_type_are_stored_and_used_in_the_filename(app_settings, DATA):
+    app_settings.pdf_filename_pattern = ("{case_encounter}-{case_location}-{case_type}-"
+                                         "CLINICALS REQUEST-{member_name}-SENT{MMDDYY}-{user}.pdf")
+    app_settings.save()
+    letter = generate_letter({**DATA, "case_location": "MIAMI", "case_type": "INPATIENT"}, "MAP\\rabdallah")
+    assert (letter.case_location, letter.case_type) == ("MIAMI", "INPATIENT")
+    name = Path(letter.pdf_path).name
+    assert name.startswith("E-100-MIAMI-INPATIENT-CLINICALS REQUEST-JOHN SMITH-SENT")
+    assert name.endswith("-rabdallah.pdf")

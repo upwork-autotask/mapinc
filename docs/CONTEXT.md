@@ -60,6 +60,14 @@ a decision changes or a milestone lands. Last updated: 2026-09-19.
   values for locked fields are replaced with the stored ones
   (`_editable_fields()` in `letters/views.py`).
 
+- 2026-09-26: the PDF file name gained launcher-supplied `case_location` and
+  `case_type` (stored on `Letter`, migration `0006`, not printed on the letter)
+  plus a `{user}` placeholder; the default pattern is now the client's
+  `{case_encounter}-{case_location}-{case_type}-CLINICALS REQUEST-{member_name}-SENT{MMDDYY}-{user}.pdf`.
+  An unknown placeholder (e.g. `{map_id}`) used to raise `KeyError` and a 500
+  page - it is now refused when the pattern is saved and reported as a form
+  error at generation time. Blank values collapse their separators.
+
 ## Open items / next steps
 1. Client server: run the `deploy/` scripts in order (see `deploy/README.md`), then
    the §6 verification checklist in the hardening plan.
