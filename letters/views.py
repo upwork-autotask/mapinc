@@ -10,7 +10,7 @@ from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import (FileResponse, Http404, HttpResponse, HttpResponseBadRequest, HttpResponseForbidden,
-                         StreamingHttpResponse)
+                         JsonResponse, StreamingHttpResponse)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -19,7 +19,9 @@ from django.views.decorators.http import require_http_methods
 
 from . import audit
 from .decorators import letter_access, staff_required
+from .docgen.filenames import InvalidFolderName, resolve_folder
 from .docgen.service import LetterGenerationError, generate_letter
+from .explorer import open_in_explorer
 from .forms import AppSettingsForm, LetterForm
 from .models import AppSettings, AuditEvent, Handoff, Letter
 
@@ -283,6 +285,34 @@ def _audit_csv(events):
     response = StreamingHttpResponse(rows(), content_type="text/csv; charset=utf-8")
     response["Content-Disposition"] = f'attachment; filename="mapinc-audit-{stamp}.csv"'
     return response
+
+
+LOOPBACK = {"127.0.0.1", "::1"}
+
+
+@letter_access
+@require_http_methods(["POST"])
+def open_folder(request):
+    """
+    Open the letter's folder in Explorer. Browsers refuse file:// links from a web
+    page, so the page asks the server instead — which is only correct when the
+    browser is on the server itself, hence the loopback check. Remote browsers get
+    "remote" back and fall back to the URL-protocol handler or the clipboard.
+    """
+    if not settings.MAPINC_LOCAL_EXPLORER:
+        return JsonResponse({"opened": False, "reason": "disabled"})
+    if audit.client_ip(request) not in LOOPBACK:
+        return JsonResponse({"opened": False, "reason": "remote"})
+
+    letter = Letter.objects.filter(case_encounter=request.POST.get("case_encounter", "").strip()).first()
+    try:
+        folder = resolve_folder(letter.folder_name if letter else request.POST.get("path", ""))
+    except InvalidFolderName as exc:
+        return JsonResponse({"opened": False, "reason": str(exc)}, status=400)
+    if not folder.is_dir():
+        return JsonResponse({"opened": False, "reason": f"The folder does not exist yet: {folder}"}, status=404)
+
+    return JsonResponse({"opened": open_in_explorer(folder), "path": str(folder)})
 
 
 def _handoff_allowed(request) -> bool:

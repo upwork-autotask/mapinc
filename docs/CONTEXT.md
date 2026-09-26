@@ -68,6 +68,12 @@ a decision changes or a milestone lands. Last updated: 2026-09-19.
   page - it is now refused when the pattern is saved and reported as a form
   error at generation time. Blank values collapse their separators.
 
+- 2026-09-26: "Open folder" now works instead of being blocked by the browser:
+  `POST /letter/open-folder/` opens Explorer server-side **for loopback requests
+  only** (`MAPINC_LOCAL_EXPLORER`), with an optional `mapinc-folder:` URL handler
+  for remote PCs (`deploy/open-folder/`, `MAPINC_FOLDER_PROTOCOL`) and the
+  clipboard as the final fallback.
+
 ## Open items / next steps
 1. Client server: run the `deploy/` scripts in order (see `deploy/README.md`), then
    the §6 verification checklist in the hardening plan.

@@ -21,7 +21,8 @@
         <div class="buttons folder-line">
           {% if pdf_exists %}<a class="button default" href="{% url 'letter_pdf' existing.case_encounter %}" target="_blank" rel="noopener">View PDF</a>{% endif %}
           {% if not edit_mode %}<a class="button" href="?case_encounter={{ existing.case_encounter|urlencode }}&amp;edit=1{% if form.user.value %}&amp;user={{ form.user.value|urlencode }}{% endif %}">Edit</a>{% endif %}
-          <button type="button" class="small open-folder" data-path="{{ existing.folder_name }}"
+          <button type="button" class="small open-folder" data-case="{{ existing.case_encounter }}"
+                  data-path="{{ existing.folder_name }}"
                   title="Copy the folder path and try to open it in File Explorer">Open folder</button>
         </div>
       </div>
@@ -39,7 +40,8 @@
         {% if field.name == "folder_name" %}
           <div class="folder">
             {{ field }}
-            <button type="button" class="small open-folder" data-path="{{ field.value|default:'' }}"
+            <button type="button" class="small open-folder" data-case="{{ form.case_encounter.value|default:'' }}"
+                    data-path="{{ field.value|default:'' }}"
                     title="Copy the folder path and try to open it in File Explorer">Open folder</button>
           </div>
         {% else %}

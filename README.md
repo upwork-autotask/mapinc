@@ -92,6 +92,17 @@ valid 15 minutes) in a new chromeless Edge window. The plain query-string form
 still works for testing:
 `/letter/?case_encounter=…&policy_id=…&member_name=…&dob=yyyy-mm-dd&admission=…&case_location=…&case_type=…&folder_name=…&user=…`
 
+### The "Open folder" button
+Browsers refuse `file://` links from a web page, so the button tries three
+things in order and stops at the first that works:
+
+1. **The server opens Explorer** - only when the browser is on the machine
+   running the app (the request comes from `127.0.0.1`). No setup; switch it
+   off with `MAPINC_LOCAL_EXPLORER=false`.
+2. **A URL-protocol handler on that PC** - install `deploy/open-folder/` once
+   per staff PC and set `MAPINC_FOLDER_PROTOCOL=mapinc-folder`.
+3. **The clipboard** - the path is copied and the page says so.
+
 ### PDF file name
 Settings → **PDF filename pattern** builds the file name. Placeholders:
 `{case_encounter}` `{policy_id}` `{member_name}` `{case_location}` `{case_type}`
@@ -130,6 +141,8 @@ variable always overrides the file. `MAPINC_ENV_FILE` points at a different file
 | `MAPINC_ALLOW_QUERY_PREFILL` | allow PHI in the URL query string (dev only; launchers use handoff tokens) |
 | `MAPINC_HANDOFF_ALLOWED_NETWORKS`, `MAPINC_HANDOFF_MINUTES` | who may create handoff links and how long they live |
 | `MAPINC_ALLOWED_FOLDER_ROOTS` | folders letters may be written under (empty = wherever the launcher says) |
+| `MAPINC_LOCAL_EXPLORER` | let the server open Explorer for a browser on the server itself (default true) |
+| `MAPINC_FOLDER_PROTOCOL` | URL scheme registered on staff PCs for "Open folder" (see `deploy/open-folder/`) |
 | `MAPINC_LISTEN` | address Waitress binds (`run.bat`; `127.0.0.1:8000` behind IIS) |
 
 ## HIPAA hardening

@@ -1,0 +1,22 @@
+Windows Registry Editor Version 5.00
+
+; Registers the "mapinc-folder:" URL scheme for the current user, so the
+; "Open folder" button on the letter page can open Windows Explorer.
+;
+; 1. Copy open-folder.vbs to C:\Program Files\MapInc\open-folder.vbs
+;    (or edit the two paths below to wherever you put it).
+; 2. Double-click this .reg file on each staff PC (or push it with Group Policy).
+; 3. On the server set  MAPINC_FOLDER_PROTOCOL=mapinc-folder  in .env and restart.
+;
+; Edge/Chrome ask "Open MapInc folder?" the first time; ticking "Always allow"
+; makes it silent afterwards.
+
+[HKEY_CURRENT_USER\Software\Classes\mapinc-folder]
+@="URL:MapInc folder"
+"URL Protocol"=""
+
+[HKEY_CURRENT_USER\Software\Classes\mapinc-folder\DefaultIcon]
+@="explorer.exe,0"
+
+[HKEY_CURRENT_USER\Software\Classes\mapinc-folder\shell\open\command]
+@="wscript.exe \"C:\\Program Files\\MapInc\\open-folder.vbs\" \"%1\""

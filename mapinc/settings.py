@@ -40,6 +40,11 @@ MAPINC_HANDOFF_MINUTES = env.get_int("MAPINC_HANDOFF_MINUTES", 5)
 MAPINC_HANDOFF_ALLOWED_NETWORKS = env.get_list("MAPINC_HANDOFF_ALLOWED_NETWORKS")
 # Empty = any full path the launcher supplies; set it to limit where letters may be written.
 MAPINC_ALLOWED_FOLDER_ROOTS = env.get_list("MAPINC_ALLOWED_FOLDER_ROOTS")
+# "Open folder": the server may open Explorer, but only for a browser on the server itself.
+MAPINC_LOCAL_EXPLORER = env.get_bool("MAPINC_LOCAL_EXPLORER", True)
+# Optional URL scheme registered on staff PCs (deploy/open-folder) so remote browsers
+# can open the folder too; empty means only the clipboard fallback is used.
+MAPINC_FOLDER_PROTOCOL = env.get("MAPINC_FOLDER_PROTOCOL", "")
 if MAPINC_AUTH_MODE not in {"open", "login", "remote_user"}:
     raise RuntimeError(f"MAPINC_AUTH_MODE must be open, login or remote_user (got {MAPINC_AUTH_MODE!r})")
 

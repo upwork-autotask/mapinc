@@ -6,6 +6,9 @@
 <title>{% block title %}Clinicals Request{% endblock %} – MAP Inc</title>
 <link rel="stylesheet" href="{% static 'letters/access.css' %}">
 <link rel="icon" href="{% static 'letters/map_logo.jpg' %}">
+<meta name="csrf-token" content="{{ csrf_token }}">
+<meta name="open-folder-url" content="{% url 'open_folder' %}">
+<meta name="folder-protocol" content="{{ folder_protocol }}">
 </head>
 <body>
 <div class="access-form {% block card_class %}{% endblock %}">
@@ -54,20 +57,44 @@
       ok ? resolve() : reject();
     });
   }
+  function mapincMeta(name) {
+    var el = document.querySelector('meta[name="' + name + '"]');
+    return el ? el.getAttribute("content") : "";
+  }
   document.querySelectorAll(".open-folder").forEach(function (btn) {
     btn.addEventListener("click", function () {
       var path = btn.getAttribute("data-path") || "";
+      var caseNo = btn.getAttribute("data-case") || "";
       var note = document.querySelector(".copy-note") || (function () {
         var el = document.createElement("div"); el.className = "copy-note";
         btn.closest(".detail").appendChild(el); return el;
       })();
       if (!path) { note.textContent = "No folder to open yet."; return; }
-      mapincCopy(path).then(
-        function () { note.textContent = "Folder path copied — paste it into File Explorer if it does not open."; },
-        function () { note.textContent = "Could not copy automatically. Folder: " + path; });
-      try { window.open(mapincFileUrl(path), "_blank"); } catch (e) { /* blocked by the browser */ }
+      note.textContent = "Opening…";
+
+      // 1. Ask the server — works when the browser is on the machine running it.
+      var body = new URLSearchParams({ case_encounter: caseNo, path: path });
+      fetch(mapincMeta("open-folder-url"), {
+        method: "POST", credentials: "same-origin", body: body,
+        headers: { "X-CSRFToken": mapincMeta("csrf-token"), "X-Requested-With": "fetch" }
+      }).then(function (r) { return r.json(); }).then(function (data) {
+        if (data.opened) { note.textContent = "Opened in File Explorer."; return; }
+        if (data.reason && data.reason !== "remote" && data.reason !== "disabled") {
+          note.textContent = data.reason; return;
+        }
+        mapincFallback(path, note);
+      }).catch(function () { mapincFallback(path, note); });
     });
   });
+
+  // 2. A URL-protocol handler on this PC (deploy/open-folder), then 3. the clipboard.
+  function mapincFallback(path, note) {
+    var proto = mapincMeta("folder-protocol");
+    if (proto) { try { window.location.href = proto + ":" + path; } catch (e) { /* not registered */ } }
+    mapincCopy(path).then(
+      function () { note.textContent = "Folder path copied — paste it into File Explorer."; },
+      function () { note.textContent = "Folder: " + path; });
+  }
 
   // Spinner while Word builds the PDF; also stops a double submit.
   document.querySelectorAll("form.detail").forEach(function (form) {

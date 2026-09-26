@@ -6,6 +6,7 @@ from . import views
 urlpatterns = [
     path("letter/", views.letter_form, name="letter_form"),
     path("letter/handoff/", views.letter_handoff, name="letter_handoff"),
+    path("letter/open-folder/", views.open_folder, name="open_folder"),
     path("letter/<str:case_encounter>/pdf/", views.letter_pdf, name="letter_pdf"),
     path("login/", auth_views.LoginView.as_view(template_name="letters/login.html",
                                                 redirect_authenticated_user=True), name="login"),
