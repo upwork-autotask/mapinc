@@ -2,10 +2,11 @@
 Phase 1.3 + 2.4 — Windows Firewall and NTFS permissions.
 Run in an elevated PowerShell on the server.
 
-  .\03-firewall-and-folders.ps1 -LanSubnet 192.168.1.0/24 -PdfRoot "D:\claims" -ClinicalGroup "MAP\MAP-Clinical" -ServiceAccount "MAP\svc-mapinc"
+  .\03-firewall-and-folders.ps1 -LanSubnet 192.168.0.0/24 -AppClientIp 192.168.0.244 -PdfRoot "D:\claims" -ClinicalGroup "MAP\MAP-Clinical" -ServiceAccount "MAP\svc-mapinc"
 #>
 param(
     [Parameter(Mandatory)] [string]$LanSubnet,
+    [string]$AppClientIp = "",
     [Parameter(Mandatory)] [string]$PdfRoot,
     [Parameter(Mandatory)] [string]$ClinicalGroup,
     [Parameter(Mandatory)] [string]$ServiceAccount
@@ -19,10 +20,16 @@ Get-NetFirewallRule -DisplayName "*postgres*" -ErrorAction SilentlyContinue | Re
 Get-NetFirewallRule -DisplayName "mapinc HTTPS" -ErrorAction SilentlyContinue | Remove-NetFirewallRule
 New-NetFirewallRule -DisplayName "mapinc HTTPS" -Direction Inbound -Protocol TCP -LocalPort 443 `
     -RemoteAddress $LanSubnet -Action Allow | Out-Null
-# Port 8000 (Waitress) must never be reachable from other machines.
+# Port 8000 (Waitress) is exposed only to the approved client server when this
+# LAN runs without IIS in front. Leave AppClientIp empty to block direct access.
 Get-NetFirewallRule -DisplayName "mapinc HTTP 8000*" -ErrorAction SilentlyContinue | Remove-NetFirewallRule
-New-NetFirewallRule -DisplayName "mapinc HTTP 8000 block" -Direction Inbound -Protocol TCP -LocalPort 8000 `
-    -Action Block | Out-Null
+if ($AppClientIp) {
+    New-NetFirewallRule -DisplayName "mapinc HTTP 8000 from client server" -Direction Inbound -Protocol TCP -LocalPort 8000 `
+        -RemoteAddress $AppClientIp -Action Allow | Out-Null
+} else {
+    New-NetFirewallRule -DisplayName "mapinc HTTP 8000 block" -Direction Inbound -Protocol TCP -LocalPort 8000 `
+        -Action Block | Out-Null
+}
 
 # --- PDF root folder ACL ------------------------------------------------------
 if (-not (Test-Path $PdfRoot)) { New-Item -ItemType Directory -Path $PdfRoot | Out-Null }

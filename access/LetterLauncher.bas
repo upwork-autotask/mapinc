@@ -26,7 +26,7 @@ Option Explicit
 ' until that window is closed; OpenClinicalsLetter returns immediately.
 ' ---------------------------------------------------------------------------
 
-Private Const LETTER_BASE_URL As String = "http://SERVER-NAME:8000"   ' <-- server running run.bat
+Private Const LETTER_BASE_URL As String = "http://192.168.0.25:8000"   ' <-- server running run.bat
 
 ' Dialog size in pixels (the web form is 480px wide)
 Private Const DIALOG_WIDTH As Long = 560

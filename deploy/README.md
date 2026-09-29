@@ -10,7 +10,7 @@ checks) are already in the code and switched on by `MAPINC_PRODUCTION=true` in
 |---|---|---|
 | 1 | `01-database-roles.sql` | Creates `mapinc_owner` / `mapinc_app` / `mapinc_report`, grants least privilege, makes the audit table insert-only, drops the dev role |
 | 2 | `02-postgresql-hardening.ps1` | SCRAM passwords, TLS-only connections from localhost, DDL/connection logging (no statement values in logs) |
-| 3 | `03-firewall-and-folders.ps1` | Firewall: 443 from the LAN only, 8000 blocked, no Postgres rule; NTFS ACL + file auditing on the PDF root |
+| 3 | `03-firewall-and-folders.ps1` | Firewall: 443 from the LAN only; 8000 blocked unless `-AppClientIp` is set; no Postgres rule; NTFS ACL + file auditing on the PDF root |
 | 4 | `04-iis/` | IIS reverse proxy: HTTPS certificate, Windows Authentication → `X-Remote-User` |
 | 5 | `05-backup-and-tasks.ps1` | Nightly `pg_dump` + `robocopy` to an encrypted volume with retention; nightly handoff-token purge |
 | 6 | `06-install-service.ps1` | Runs `run.bat` as a Windows service under a low-privilege account, bound to `127.0.0.1:8000` |
@@ -44,7 +44,7 @@ $env:MAPINC_ENV_FILE = "C:\mapinc\.env.migrate"; python manage.py migrate; Remov
 python manage.py check
 
 # 5. firewall, folders, IIS, backups, service
-.\deploy\03-firewall-and-folders.ps1 -LanSubnet 192.168.1.0/24 -PdfRoot D:\claims -ClinicalGroup "MAP\MAP-Clinical" -ServiceAccount "MAP\svc-mapinc"
+.\deploy\03-firewall-and-folders.ps1 -LanSubnet 192.168.0.0/24 -AppClientIp 192.168.0.244 -PdfRoot D:\claims -ClinicalGroup "MAP\MAP-Clinical" -ServiceAccount "MAP\svc-mapinc"
 #   follow deploy\04-iis\README.md
 .\deploy\05-backup-and-tasks.ps1 -RepoDir C:\mapinc -BackupDir E:\Backups -PdfRoot D:\claims -ServiceAccount "MAP\svc-mapinc"
 .\deploy\06-install-service.ps1 -RepoDir C:\mapinc -ServiceAccount "MAP\svc-mapinc"
